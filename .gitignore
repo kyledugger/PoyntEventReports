@@ -1,4 +1,5 @@
 private-key.pem
+password.txt
 .venv/
 __pycache__/
 *.pyc
