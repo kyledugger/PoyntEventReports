@@ -6,7 +6,7 @@ app = FastAPI(title="Codelian Poynt")
 async def root():
     return {
         "application": "Codelian Poynt",
-        "message": "Hello World!"
+        "message": "Hello Event Reports Customers!"
     }
 
 @app.get("/health")
