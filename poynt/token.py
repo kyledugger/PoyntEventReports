@@ -102,3 +102,34 @@ async def exchange_authorization_code(
         response.raise_for_status()
 
     return response.json()
+
+async def get_catalogs(
+    access_token: str,
+    business_id: str,
+) -> dict:
+    url = (
+        f"https://services.poynt.net"
+        f"/businesses/{business_id}/catalogs"
+    )
+
+    headers = {
+        "Accept": "application/json",
+        "api-version": "1.2",
+        "Authorization": f"Bearer {access_token}",
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.get(
+            url,
+            headers=headers,
+        )
+
+    print("Poynt catalog request:")
+    print("  HTTP status:", response.status_code)
+    print("  Business ID:", business_id)
+
+    if not response.is_success:
+        print("  Response:", response.text)
+        response.raise_for_status()
+
+    return response.json()

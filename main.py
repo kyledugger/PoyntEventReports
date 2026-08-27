@@ -1,4 +1,4 @@
-from poynt.token import exchange_authorization_code
+from poynt.token import exchange_authorization_code, get_catalogs
 
 import os
 import secrets
@@ -14,7 +14,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from auth import hash_password, verify_password
 from database import SessionLocal
 from models import User
-
 
 load_dotenv()
 
@@ -281,6 +280,9 @@ async def oauth_callback(
             code=code,
             redirect_uri=POYNT_REDIRECT_URI,
         )
+        
+        access_token = token_response["accessToken"]
+        business_id = token_response["businessId"]
     except Exception:
         return HTMLResponse(
             """
@@ -296,15 +298,29 @@ async def oauth_callback(
             status_code=502,
         )
 
+    if not business_id:
+        return HTMLResponse(
+            "<h1>Poynt Error</h1>"
+            "<p>No business ID was returned.</p>",
+            status_code=400,
+        )
+
+    catalogs = await get_catalogs(
+        access_token,
+        business_id,
+    )
+
     return HTMLResponse(
-        """
-        <h1>Poynt Token Success</h1>
-        <p>
-            Poynt authorization and merchant token exchange
-            succeeded.
-        </p>
+        f"""
+        <h1>Poynt API Success!</h1>
+        <p>Merchant token exchange succeeded.</p>
+        <p>Catalog API call succeeded.</p>
+        <p>Business ID: {businessId}</p>
+        <p>Business ID: {token_response}</p>        
+        <p>Catalog response received.{catalogs}</p>
         """
     )
+    
 
 @app.get("/debug/poynt-jwt")
 async def debug_poynt_jwt():
