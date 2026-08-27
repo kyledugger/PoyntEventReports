@@ -283,17 +283,19 @@ async def oauth_callback(
         
         access_token = token_response["accessToken"]
         business_id = token_response["businessId"]
-    except Exception:
+    except Exception as e:
+        print(f"Poynt token request failed: {type(e).__name__}: {e}", flush=True)
+
         return HTMLResponse(
             """
             <h1>Poynt Token Error</h1>
             <p>
-                Poynt authorization succeeded, but the
-                merchant token request failed.
+                Poynt authorization succeeded, but the merchant token request failed.
             </p>
             <p>
                 Check the Render/application logs.
             </p>
+            <p>Token: {token_response}</p>               
             """,
             status_code=502,
         )
@@ -316,7 +318,7 @@ async def oauth_callback(
         <p>Merchant token exchange succeeded.</p>
         <p>Catalog API call succeeded.</p>
         <p>Business ID: {businessId}</p>
-        <p>Business ID: {token_response}</p>        
+        <p>Token: {token_response}</p>        
         <p>Catalog response received.{catalogs}</p>
         """
     )
