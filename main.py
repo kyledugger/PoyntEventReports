@@ -192,105 +192,105 @@ async def dashboard(request: Request):
         }
     )
 
-    @app.get("/oauth/start")
-    async def oauth_start(request: Request):
+@app.get("/oauth/start")
+async def oauth_start(request: Request):
 
-        user_id = request.session.get("user_id")
+    user_id = request.session.get("user_id")
 
-        if not user_id:
-            return RedirectResponse(
-                "/login",
-                status_code=303
-            )
-
-        # Generate a random value that will come back from Poynt
-        context = secrets.token_urlsafe(32)
-
-        # Remember which Codelian session initiated this OAuth request
-        request.session["poynt_oauth_context"] = context
-
-        params = {
-            "client_id": POYNT_APP_ID,
-            "redirect_uri": POYNT_REDIRECT_URI,
-            "context": context,
-        }
-
-        authorization_url = (
-            f"{POYNT_AUTHORIZE_URL}?{urlencode(params)}"
-        )
-
+    if not user_id:
         return RedirectResponse(
-            authorization_url,
+            "/login",
             status_code=303
         )
 
-    @app.get("/oauth/callback", response_class=HTMLResponse)
-    async def oauth_callback(
-        request: Request,
-        code: str | None = None,
-        status: str | None = None,
-        context: str | None = None,
-        businessId: str | None = None,
-    ):
-        expected_context = request.session.get(
-            "poynt_oauth_context"
-        )
+    # Generate a random value that will come back from Poynt
+    context = secrets.token_urlsafe(32)
 
-        if not expected_context:
-            return HTMLResponse(
-                "<h1>OAuth Error</h1>"
-                "<p>No OAuth session was found.</p>",
-                status_code=400
-            )
+    # Remember which Codelian session initiated this OAuth request
+    request.session["poynt_oauth_context"] = context
 
-        if not context or not secrets.compare_digest(
-            context,
-            expected_context
-        ):
-            return HTMLResponse(
-                "<h1>OAuth Error</h1>"
-                "<p>OAuth context validation failed.</p>",
-                status_code=400
-            )
+    params = {
+        "client_id": POYNT_APP_ID,
+        "redirect_uri": POYNT_REDIRECT_URI,
+        "context": context,
+    }
 
-        # The OAuth request has successfully returned to us.
-        # We are intentionally NOT exchanging the code yet.
+    authorization_url = (
+        f"{POYNT_AUTHORIZE_URL}?{urlencode(params)}"
+    )
 
-        request.session.pop("poynt_oauth_context", None)
+    return RedirectResponse(
+        authorization_url,
+        status_code=303
+    )
 
-        if status != "SUCCESS":
-            return HTMLResponse(
-                f"""
-                <h1>Poynt Authorization</h1>
-                <p>Authorization was not completed.</p>
-                <p>Status: {status or "unknown"}</p>
-                """,
-                status_code=400
-            )
+@app.get("/oauth/callback", response_class=HTMLResponse)
+async def oauth_callback(
+    request: Request,
+    code: str | None = None,
+    status: str | None = None,
+    context: str | None = None,
+    businessId: str | None = None,
+):
+    expected_context = request.session.get(
+        "poynt_oauth_context"
+    )
 
-        if not code:
-            return HTMLResponse(
-                "<h1>OAuth Error</h1>"
-                "<p>Poynt did not provide an authorization code.</p>",
-                status_code=400
-            )
-
+    if not expected_context:
         return HTMLResponse(
-            """
-            <h1>Poynt Authorization Received</h1>
-            <p>Success!</p>
-            <p>
-                Codelian successfully received the authorization
-                response from Poynt.
-            </p>
-            <p>
-                The authorization code has NOT been exchanged yet.
-            </p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """
+            "<h1>OAuth Error</h1>"
+            "<p>No OAuth session was found.</p>",
+            status_code=400
         )
+
+    if not context or not secrets.compare_digest(
+        context,
+        expected_context
+    ):
+        return HTMLResponse(
+            "<h1>OAuth Error</h1>"
+            "<p>OAuth context validation failed.</p>",
+            status_code=400
+        )
+
+    # The OAuth request has successfully returned to us.
+    # We are intentionally NOT exchanging the code yet.
+
+    request.session.pop("poynt_oauth_context", None)
+
+    if status != "SUCCESS":
+        return HTMLResponse(
+            f"""
+            <h1>Poynt Authorization</h1>
+            <p>Authorization was not completed.</p>
+            <p>Status: {status or "unknown"}</p>
+            """,
+            status_code=400
+        )
+
+    if not code:
+        return HTMLResponse(
+            "<h1>OAuth Error</h1>"
+            "<p>Poynt did not provide an authorization code.</p>",
+            status_code=400
+        )
+
+    return HTMLResponse(
+        """
+        <h1>Poynt Authorization Received</h1>
+        <p>Success!</p>
+        <p>
+            Codelian successfully received the authorization
+            response from Poynt.
+        </p>
+        <p>
+            The authorization code has NOT been exchanged yet.
+        </p>
+        <p>
+            <a href="/dashboard">Return to Dashboard</a>
+        </p>
+        """
+    )
 
 @app.get("/health")
 async def health():
