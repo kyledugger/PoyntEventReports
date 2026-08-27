@@ -258,7 +258,7 @@ async def oauth_callback(
 
     request.session.pop("poynt_oauth_context", None)
 
-    if status != "SUCCESS":
+    if status != "success":
         return HTMLResponse(
             f"""
             <h1>Poynt Authorization</h1>
