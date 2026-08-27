@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Account - Codelian Poynt</title>
+</head>
+
+<body>
+
+    <h1>Create Codelian Account</h1>
+
+    {% if error %}
+        <p>{{ error }}</p>
+    {% endif %}
+
+    <form method="post">
+
+        <div>
+            <label for="email">Email:</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="password">Password:</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                required
+            >
+        </div>
+
+        <br>
+
+        <button type="submit">
+            Create Account
+        </button>
+
+    </form>
+
+    <p>
+        Already have an account?
+        <a href="/login">Log in</a>
+    </p>
+
+</body>
+</html>

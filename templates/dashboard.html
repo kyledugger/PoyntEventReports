@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Codelian Poynt Dashboard</title>
+</head>
+
+<body>
+
+    <h1>Codelian Poynt</h1>
+
+    <p>
+        Welcome, {{ user.email }}
+    </p>
+
+    <p>
+        You are successfully authenticated.
+    </p>
+
+    <hr>
+
+    <h2>Poynt</h2>
+
+    <p>
+        Connection:
+        <strong>Not connected</strong>
+    </p>
+
+    <form method="post" action="/logout">
+        <button type="submit">
+            Log Out
+        </button>
+    </form>
+
+</body>
+</html>
