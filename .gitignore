@@ -1,7 +1,9 @@
 poynt_private_key.pem
+*.pem
 password.txt
 .venv/
 __pycache__/
 *.pyc
 .env
 .env.*
+jwt_decode.py

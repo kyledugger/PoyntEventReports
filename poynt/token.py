@@ -88,11 +88,17 @@ async def exchange_authorization_code(
         )
 
     if not response.is_success:
-        print(
-            "Poynt token request failed:",
-            response.status_code,
-            response.text,
-        )
+        print("Poynt token request failed:")
+        print("  HTTP status:", response.status_code)
+        print("  Response:", response.text)
+        print("  Token URL:", poynt_token_url)
+        print("  App ID:", poynt_app_id)
+        print("  Redirect URI:", redirect_uri)
+        print("  Grant type:", data["grant_type"])
+        print("  Code present:", bool(code))
+        print("  Self-signed JWT present:", bool(self_signed_jwt))
+        print("  Self-signed JWT length:", len(self_signed_jwt))
+
         response.raise_for_status()
 
     return response.json()
