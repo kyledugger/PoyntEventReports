@@ -253,11 +253,6 @@ async def oauth_callback(
             status_code=400
         )
 
-    # The OAuth request has successfully returned to us.
-    # We are intentionally NOT exchanging the code yet.
-
-    request.session.pop("poynt_oauth_context", None)
-
     if not status or status.lower() != "success":
         return HTMLResponse(
             f"""
@@ -274,6 +269,10 @@ async def oauth_callback(
             "<p>Poynt did not provide an authorization code.</p>",
             status_code=400
         )
+
+    # OAuth response is valid.
+    # Consume the context so it cannot be reused.
+    request.session.pop("poynt_oauth_context", None)
 
     return HTMLResponse(
         """
