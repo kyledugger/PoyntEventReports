@@ -287,7 +287,7 @@ async def oauth_callback(
         print(f"Poynt token request failed: {type(e).__name__}: {e}", flush=True)
 
         return HTMLResponse(
-            """
+            f"""
             <h1>Poynt Token Error</h1>
             <p>
                 Poynt authorization succeeded, but the merchant token request failed.
