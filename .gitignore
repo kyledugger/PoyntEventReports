@@ -1,4 +1,4 @@
-private-key.pem
+poynt_private_key.pem
 password.txt
 .venv/
 __pycache__/

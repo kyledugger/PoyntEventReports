@@ -1,3 +1,5 @@
+from poynt.token import exchange_authorization_code
+
 import os
 import secrets
 from urllib.parse import urlencode
@@ -274,22 +276,46 @@ async def oauth_callback(
     # Consume the context so it cannot be reused.
     request.session.pop("poynt_oauth_context", None)
 
+    try:
+        token_response = await exchange_authorization_code(
+            code=code,
+            redirect_uri=POYNT_REDIRECT_URI,
+        )
+    except Exception:
+        return HTMLResponse(
+            """
+            <h1>Poynt Token Error</h1>
+            <p>
+                Poynt authorization succeeded, but the
+                merchant token request failed.
+            </p>
+            <p>
+                Check the Render/application logs.
+            </p>
+            """,
+            status_code=502,
+        )
+
     return HTMLResponse(
         """
-        <h1>Poynt Authorization Received</h1>
-        <p>Success!</p>
+        <h1>Poynt Token Success</h1>
         <p>
-            Codelian successfully received the authorization
-            response from Poynt.
-        </p>
-        <p>
-            The authorization code has NOT been exchanged yet.
-        </p>
-        <p>
-            <a href="/dashboard">Return to Dashboard</a>
+            Poynt authorization and merchant token exchange
+            succeeded.
         </p>
         """
     )
+
+@app.get("/debug/poynt-jwt")
+async def debug_poynt_jwt():
+    from poynt.token import create_self_signed_jwt
+
+    token = create_self_signed_jwt()
+
+    return {
+        "created": True,
+        "jwt_length": len(token)
+    }
 
 @app.get("/health")
 async def health():
