@@ -1,4 +1,5 @@
-from poynt.token import exchange_authorization_code, get_catalogs
+from poynt.token import exchange_authorization_code
+from poynt.client import PoyntClient
 
 import os
 import secrets
@@ -375,14 +376,10 @@ async def poynt_catalog(request: Request):
             status_code=404
         )
 
-    access_token = credentials.access_token
-    business_id = credentials.business_id
+    client = PoyntClient(credentials)
 
     try:
-        catalogs = await get_catalogs(
-            access_token,
-            business_id
-        )
+        catalogs = await client.get_catalogs()
 
     except Exception as e:
         print(
