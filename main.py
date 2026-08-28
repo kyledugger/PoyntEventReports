@@ -681,56 +681,56 @@ async def poynt_orders(request: Request):
             <title>Recent Poynt Orders</title>
 
             <style>
-                body {
+                body {{
                     font-family: Arial, sans-serif;
                     margin: 30px;
-                }
+                }}
 
-                h1 {
+                h1 {{
                     margin-bottom: 5px;
-                }
+                }}
 
-                .summary {
+                .summary {{
                     margin-bottom: 10px;
-                }
+                }}
 
-                .order {
+                .order {{
                     margin-bottom: 25px;
                     border: 1px solid #aaa;
                     padding: 12px;
-                }
+                }}
 
-                .order-header {
+                .order-header {{
                     display: grid;
                     grid-template-columns: 1fr 1fr auto;
                     gap: 20px;
                     align-items: center;
                     margin-bottom: 10px;
                     font-size: 18px;
-                }
+                }}
 
-                .status {
+                .status {{
                     margin-left: 10px;
                     font-size: 14px;
                     font-weight: normal;
-                }
+                }}
 
-                table {
+                table {{
                     border-collapse: collapse;
                     width: 100%;
-                }
+                }}
 
                 th,
-                td {
+                td {{
                     border: 1px solid #ccc;
                     padding: 7px;
                     text-align: left;
                     vertical-align: top;
-                }
+                }}
 
-                th {
+                th {{
                     font-weight: bold;
-                }
+                }}
             </style>
         </head>
 
