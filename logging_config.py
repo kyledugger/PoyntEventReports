@@ -19,3 +19,6 @@ def configure_logging() -> None:
         "Application logging configured at %s level.",
         level_name,
     )
+
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)    
