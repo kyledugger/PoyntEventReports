@@ -179,7 +179,6 @@ async def dashboard(request: Request):
         user = session.get(User, user_id)
 
         if not user:
-
             request.session.clear()
 
             return RedirectResponse(
@@ -187,11 +186,16 @@ async def dashboard(request: Request):
                 status_code=303
             )
 
+        poynt_connection = session.query(PoyntConnection).filter(
+            PoyntConnection.user_id == user_id
+        ).one_or_none()
+
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
         context={
-            "user": user
+            "user": user,
+            "poynt_connection": poynt_connection
         }
     )
 

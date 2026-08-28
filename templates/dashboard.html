@@ -20,32 +20,44 @@
 
     <h2>Poynt</h2>
 
-    <p>
-        Connection:
-        <strong>Not connected</strong>
-    </p>
+    {% if poynt_connection %}
 
-    <p>
-        <a href="/oauth/start">
-            <button type="button">
-                Connect Poynt
-            </button>
-        </a>
-    </p>
+        <p>
+            Connection:
+            <strong>Connected</strong>
+        </p>
 
-    <p>
-        <a href="/poynt/catalog">
-            <button type="button">
-                Load Poynt Catalog
-            </button>
-        </a>
-    </p>
+        <p>
+            <a href="/poynt/catalog">
+                <button type="button">
+                    Load Poynt Catalog
+                </button>
+            </a>
+        </p>
 
-    <form method="post" action="/logout">
-        <button type="submit">
-            Log Out
-        </button>
-    </form>
+        <p>
+            <a href="/oauth/start">
+                <button type="button">
+                    Reconnect Poynt
+                </button>
+            </a>
+        </p>
 
+    {% else %}
+
+        <p>
+            Connection:
+            <strong>Not connected</strong>
+        </p>
+
+        <p>
+            <a href="/oauth/start">
+                <button type="button">
+                    Connect Poynt
+                </button>
+            </a>
+        </p>
+
+    {% endif %}
 </body>
 </html>
