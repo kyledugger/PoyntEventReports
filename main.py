@@ -235,6 +235,15 @@ async def oauth_callback(
     context: str | None = None,
     businessId: str | None = None,
 ):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return HTMLResponse(
+            "<h1>OAuth Error</h1>"
+            "<p>Your Codelian login session could not be found.</p>",
+            status_code=401
+        )
+    
     expected_context = request.session.get(
         "poynt_oauth_context"
     )
