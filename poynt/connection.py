@@ -14,27 +14,21 @@ class PoyntCredentials:
     expires_at: datetime | None
 
 
-def get_poynt_connection(
-    user_id: int,
-    business_id: str | None = None,
-) -> PoyntConnection | None:
+def get_poynt_connection(user_id: int) -> PoyntConnection | None:
+    """
+    Return the Poynt connection belonging to a Codelian user.
+
+    Returns None if the user has not connected Poynt.
+    """
 
     with SessionLocal() as session:
-
-        query = session.query(PoyntConnection).filter(
+        return session.query(PoyntConnection).filter(
             PoyntConnection.user_id == user_id
-        )
+        ).one_or_none()
 
-        if business_id:
-            query = query.filter(
-                PoyntConnection.business_id == business_id
-            )
-
-        return query.one_or_none()
 
 def get_poynt_credentials(
-    user_id: int,
-    business_id: str,
+    user_id: int
 ) -> PoyntCredentials | None:
     """
     Retrieve the Poynt credentials associated with a Codelian user.
@@ -42,10 +36,7 @@ def get_poynt_credentials(
     Returns None if the user has not connected Poynt.
     """
 
-    connection = get_poynt_connection(
-        user_id,
-        business_id,
-    )
+    connection = get_poynt_connection(user_id)
 
     if not connection:
         return None
@@ -74,8 +65,7 @@ def save_poynt_connection(
     with SessionLocal() as session:
 
         connection = session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id,
-            PoyntConnection.business_id == business_id,
+            PoyntConnection.user_id == user_id
         ).one_or_none()
 
         if connection:
