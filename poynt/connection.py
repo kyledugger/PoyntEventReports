@@ -1,8 +1,13 @@
 from dataclasses import dataclass
 from datetime import datetime
+from venv import logger
 
 from database import SessionLocal
 from models import PoyntConnection
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,6 +54,11 @@ def get_poynt_credentials(
         expires_at=connection.expires_at,
     )
 
+    logger.info(
+        "Poynt token refresh window: %s seconds",
+        refresh_window_seconds,
+    )
+
 
 def save_poynt_connection(
     user_id: int,
@@ -74,6 +84,10 @@ def save_poynt_connection(
             connection.refresh_token = refresh_token
             connection.token_type = token_type
             connection.expires_at = expires_at
+            logger.info(
+                "Updated existing Poynt connection for user_id=%d",
+                user_id,
+                )
 
         else:
             connection = PoyntConnection(
@@ -84,6 +98,10 @@ def save_poynt_connection(
                 token_type=token_type,
                 expires_at=expires_at,
             )
+            logger.info(
+                "Created new Poynt connection for user_id=%d",
+                user_id,
+                )
 
             session.add(connection)
 

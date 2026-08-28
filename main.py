@@ -28,6 +28,10 @@ from poynt.client import (
 
 load_dotenv()
 
+from logging_config import configure_logging
+
+configure_logging()
+
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 POYNT_REDIRECT_URI = os.environ["POYNT_REDIRECT_URI"]
@@ -387,7 +391,7 @@ async def poynt_catalog(request: Request):
         )
 
         catalogs = await client.get_catalogs()
-        
+
     except PoyntReauthorizationRequired:
         return HTMLResponse(
             """

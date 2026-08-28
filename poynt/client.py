@@ -6,6 +6,10 @@ import httpx
 from poynt.connection import PoyntCredentials, save_poynt_connection
 from poynt.token import refresh_access_token
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class PoyntAPIError(Exception):
     """Raised when a Poynt API request fails."""
@@ -63,6 +67,11 @@ class PoyntClient:
                 "Poynt access token has no expiration time."
             )
 
+        logger.debug(
+            "Poynt token expiration check: expires_at=%s",
+            self.expires_at,
+        )
+
         now = datetime.now(timezone.utc)
         expires_at = self.expires_at
 
@@ -85,6 +94,10 @@ class PoyntClient:
         state = self._expiration_state()
 
         if state == "valid":
+            logger.debug(
+                "Poynt access token is outside refresh window; "
+                "no refresh needed."
+            )
             return
 
         if state == "expired":
@@ -96,6 +109,11 @@ class PoyntClient:
         # From this point forward we know:
         # - the token is not expired
         # - the token is inside the configured refresh window
+
+        logger.info(
+            "Poynt access token is within refresh window; "
+            "refreshing before API request."
+        )
 
         if not self.refresh_token:
             raise PoyntReauthorizationRequired(
@@ -135,6 +153,12 @@ class PoyntClient:
             datetime.now(timezone.utc)
             + timedelta(seconds=int(expires_in))
         )
+
+        logger.info(
+            "Poynt access token refreshed successfully; "
+            "new expiration: %s",
+            expires_at,
+        )        
 
         # Update the in-memory client first.
         self.access_token = access_token

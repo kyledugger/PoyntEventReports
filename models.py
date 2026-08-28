@@ -5,6 +5,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class User(Base):
     __tablename__ = "users"
