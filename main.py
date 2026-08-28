@@ -11,10 +11,15 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
-
+from datetime import datetime, timedelta
 from auth import hash_password, verify_password
 from database import Base, SessionLocal, engine
-from models import User, PoyntConnection
+from models import User
+from poynt.connection import (
+    get_poynt_connection,
+    get_poynt_credentials,
+    save_poynt_connection,
+)
 
 load_dotenv()
 
@@ -36,7 +41,6 @@ app.add_middleware(
 
 
 templates = Jinja2Templates(directory="templates")
-
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -186,9 +190,7 @@ async def dashboard(request: Request):
                 status_code=303
             )
 
-        poynt_connection = session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id
-        ).one_or_none()
+    poynt_connection = get_poynt_connection(user_id)
 
     return templates.TemplateResponse(
         request=request,
@@ -325,53 +327,24 @@ async def oauth_callback(
             status_code=400,
         )
 
-    with SessionLocal() as session:
-        connection = session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id
-        ).one_or_none()
+    expires_in = token_response.get("expiresIn")
 
-        if connection:
-            connection.business_id = businessId
-            connection.access_token = access_token
-            connection.refresh_token = token_response.get("refreshToken")
-            connection.token_type = token_response.get("tokenType")
+    expires_at = None
 
-            expires_in = token_response.get("expiresIn")
+    if expires_in:
+        expires_at = (
+            datetime.utcnow()
+            + timedelta(seconds=int(expires_in))
+        )
 
-            if expires_in:
-                from datetime import datetime, timedelta
-
-                connection.expires_at = (
-                    datetime.utcnow()
-                    + timedelta(seconds=int(expires_in))
-                )
-
-        else:
-            from datetime import datetime, timedelta
-
-            expires_in = token_response.get("expiresIn")
-
-            expires_at = None
-
-            if expires_in:
-                expires_at = (
-                    datetime.utcnow()
-                    + timedelta(seconds=int(expires_in))
-                )
-
-            connection = PoyntConnection(
-                user_id=user_id,
-                business_id=businessId,
-                access_token=access_token,
-                refresh_token=token_response.get("refreshToken"),
-                token_type=token_response.get("tokenType"),
-                expires_at=expires_at,
-            )
-
-            session.add(connection)
-
-        session.commit()
-
+    save_poynt_connection(
+        user_id=user_id,
+        business_id=businessId,
+        access_token=access_token,
+        refresh_token=token_response.get("refreshToken"),
+        token_type=token_response.get("tokenType"),
+        expires_at=expires_at,
+    )
     return RedirectResponse(
         "/dashboard",
         status_code=303
@@ -388,26 +361,22 @@ async def poynt_catalog(request: Request):
             status_code=303
         )
 
-    with SessionLocal() as session:
+    credentials = get_poynt_credentials(user_id)
 
-        connection = session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id
-        ).one_or_none()
+    if not credentials:
+        return HTMLResponse(
+            """
+            <h1>Poynt Error</h1>
+            <p>No Poynt connection was found.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=404
+        )
 
-        if not connection:
-            return HTMLResponse(
-                """
-                <h1>Poynt Error</h1>
-                <p>No Poynt connection was found.</p>
-                <p>
-                    <a href="/dashboard">Return to Dashboard</a>
-                </p>
-                """,
-                status_code=404
-            )
-
-        access_token = connection.access_token
-        business_id = connection.business_id
+    access_token = credentials.access_token
+    business_id = credentials.business_id
 
     try:
         catalogs = await get_catalogs(
