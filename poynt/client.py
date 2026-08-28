@@ -67,6 +67,9 @@ class PoyntClient:
                 "Poynt access token has no expiration time."
             )
 
+        now = datetime.now(timezone.utc)
+        expires_at = self.expires_at
+
         logger.debug(
             "Poynt token expiration check: expires_at=%s, "
             "seconds_remaining=%.1f, refresh_window_seconds=%d",
@@ -74,10 +77,7 @@ class PoyntClient:
             (expires_at - now).total_seconds(),
             self.refresh_window.total_seconds(),
         )
-
-        now = datetime.now(timezone.utc)
-        expires_at = self.expires_at
-
+        
         # PostgreSQL may return a naive datetime depending on
         # the database column configuration.
         if expires_at.tzinfo is None:
