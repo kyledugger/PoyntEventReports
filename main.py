@@ -31,6 +31,7 @@ load_dotenv()
 
 from logging_config import configure_logging
 
+import logging
 configure_logging()
 
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
