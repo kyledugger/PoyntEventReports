@@ -14,3 +14,8 @@ def configure_logging() -> None:
         ),
         force=True,
     )
+
+    logging.getLogger(__name__).info(
+        "Application logging configured at %s level.",
+        level_name,
+    )
