@@ -5,7 +5,9 @@ from pathlib import Path
 
 import httpx
 import jwt
+import logging
 
+logger = logging.getLogger(__name__)
 
 
 PRIVATE_KEY_PATH = (
@@ -88,16 +90,18 @@ async def exchange_authorization_code(
         )
 
     if not response.is_success:
-        print("Poynt token request failed:")
-        print("  HTTP status:", response.status_code)
-        print("  Response:", response.text)
-        print("  Token URL:", poynt_token_url)
-        print("  App ID:", poynt_app_id)
-        print("  Redirect URI:", redirect_uri)
-        print("  Grant type:", data["grant_type"])
-        print("  Code present:", bool(code))
-        print("  Self-signed JWT present:", bool(self_signed_jwt))
-        print("  Self-signed JWT length:", len(self_signed_jwt))
+        logger.error(
+            "Poynt token request failed:\n"
+            f"  HTTP status: {response.status_code}\n"
+            f"  Response: {response.text}\n"
+            f"  Token URL: {poynt_token_url}\n"
+            f"  App ID: {poynt_app_id}\n"
+            f"  Redirect URI: {redirect_uri}\n"
+            f"  Grant type: {data['grant_type']}\n"
+            f"  Code present: {bool(code)}\n"
+            f"  Self-signed JWT present: {bool(self_signed_jwt)}\n"
+            f"  Self-signed JWT length: {len(self_signed_jwt)}"
+        )
 
         response.raise_for_status()
 
@@ -129,6 +133,8 @@ async def refresh_access_token(
         "refreshToken": refresh_token,
     }
 
+    logger.info("Refreshing Poynt access token with refresh token" )
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             poynt_token_url,
@@ -137,11 +143,14 @@ async def refresh_access_token(
         )
 
     if not response.is_success:
-        print("Poynt token refresh failed:")
-        print("  HTTP status:", response.status_code)
-        print("  Refresh token present:", bool(refresh_token))
-        print("  Refresh token length:", len(refresh_token))
-        print("  Response:", response.text)
+        logger.error(
+            "Poynt token exchange failed: HTTP %d",
+            response.status_code,
+        )
+        logger.debug(
+            "Poynt token exchange error response: %s",
+            response.text,
+        )        
 
         response.raise_for_status()
 

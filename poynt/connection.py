@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from venv import logger
 
 from database import SessionLocal
 from models import PoyntConnection
@@ -52,11 +51,6 @@ def get_poynt_credentials(
         refresh_token=connection.refresh_token,
         token_type=connection.token_type,
         expires_at=connection.expires_at,
-    )
-
-    logger.info(
-        "Poynt token refresh window: %s seconds",
-        refresh_window_seconds,
     )
 
 

@@ -68,8 +68,11 @@ class PoyntClient:
             )
 
         logger.debug(
-            "Poynt token expiration check: expires_at=%s",
-            self.expires_at,
+            "Poynt token expiration check: expires_at=%s, "
+            "seconds_remaining=%.1f, refresh_window_seconds=%d",
+            expires_at,
+            (expires_at - now).total_seconds(),
+            self.refresh_window.total_seconds(),
         )
 
         now = datetime.now(timezone.utc)
@@ -82,11 +85,37 @@ class PoyntClient:
                 tzinfo=timezone.utc
             )
 
+        seconds_remaining = (
+            expires_at - now
+        ).total_seconds()
+
+        logger.debug(
+            "Poynt token expiration check: "
+            "seconds_remaining=%.1f, refresh_window_seconds=%d",
+            seconds_remaining,
+            int(self.refresh_window.total_seconds()),
+        )
+
         if now >= expires_at:
+            logger.warning(
+                "Poynt access token has expired; "
+                "reauthorization is required."
+            )
             return "expired"
 
         if now + self.refresh_window >= expires_at:
+            logger.info(
+                "Poynt access token is within refresh window "
+                "(%.1f seconds remaining); refreshing.",
+                seconds_remaining,
+            )
             return "refresh"
+
+        logger.debug(
+            "Poynt access token is valid and outside "
+            "the refresh window (%.1f seconds remaining).",
+            seconds_remaining,
+        )
 
         return "valid"
 
@@ -179,6 +208,10 @@ class PoyntClient:
     async def get_catalogs(self) -> dict:
         await self._refresh_if_needed()
 
+        logger.info(
+            "Poynt catalog request starting."
+        )        
+
         url = (
             f"{self.BASE_URL}"
             f"/businesses/{self.business_id}/catalogs"
@@ -191,9 +224,18 @@ class PoyntClient:
             )
 
         if not response.is_success:
+            logger.error(
+                "Poynt catalog request failed: HTTP %d",
+                response.status_code,
+            )            
             raise PoyntAPIError(
                 f"Poynt API returned HTTP "
                 f"{response.status_code}"
             )
+
+        logger.info(
+            "Poynt catalog request succeeded: HTTP %d",
+            response.status_code,
+        )  
 
         return response.json()
