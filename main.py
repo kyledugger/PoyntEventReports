@@ -589,7 +589,11 @@ async def poynt_orders(request: Request):
             )
 
             product_id = escape(
-                str(item.get("productId") or "")
+                str(item.get("notes") or "")
+            )
+
+            product_id = escape(
+                str(item.get("status") or "")
             )
 
             item_rows.append(
@@ -600,6 +604,7 @@ async def poynt_orders(request: Request):
                     <td>{details}</td>
                     <td>{sku}</td>
                     <td>{product_id}</td>
+                    <td>{status}</td>
                 </tr>
                 """
             )
@@ -647,7 +652,8 @@ async def poynt_orders(request: Request):
                             <th>Qty</th>
                             <th>Details</th>
                             <th>SKU</th>
-                            <th>Product ID</th>
+                            <th>Notes</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
 
