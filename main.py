@@ -368,21 +368,81 @@ async def oauth_callback(
 
         session.commit()
 
-    catalogs = await get_catalogs(
-        access_token,
-        businessId,
-    )
+    return RedirectResponse(
+        "/dashboard",
+        status_code=303
+    )        
+
+@app.get("/poynt/catalog", response_class=HTMLResponse)
+async def poynt_catalog(request: Request):
+
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    with SessionLocal() as session:
+
+        connection = session.query(PoyntConnection).filter(
+            PoyntConnection.user_id == user_id
+        ).one_or_none()
+
+        if not connection:
+            return HTMLResponse(
+                """
+                <h1>Poynt Error</h1>
+                <p>No Poynt connection was found.</p>
+                <p>
+                    <a href="/dashboard">Return to Dashboard</a>
+                </p>
+                """,
+                status_code=404
+            )
+
+        access_token = connection.access_token
+        business_id = connection.business_id
+
+    try:
+        catalogs = await get_catalogs(
+            access_token,
+            business_id
+        )
+
+    except Exception as e:
+        print(
+            f"Poynt catalog request failed: "
+            f"{type(e).__name__}: {e}",
+            flush=True
+        )
+
+        return HTMLResponse(
+            """
+            <h1>Poynt Catalog Error</h1>
+            <p>The catalog request failed.</p>
+            <p>Check the application logs.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=502
+        )
 
     return HTMLResponse(
-        f"""
-        <h1>Poynt API Success!</h1>
-        <p>Merchant token exchange succeeded.</p>
-        <p>Catalog API call succeeded.</p>
-        <p>Business ID: {businessId}</p>
-        <p>Catalog response received.{catalogs}</p>
+        """
+        <h1>Poynt Catalog Success!</h1>
+        <p>Catalog request succeeded.</p>
+        <p>
+            The Poynt access token was retrieved from the
+            database and used to make this request.
+        </p>
+        <p>
+            <a href="/dashboard">Return to Dashboard</a>
+        </p>
         """
     )
-    
 
 @app.get("/debug/poynt-jwt")
 async def debug_poynt_jwt():
