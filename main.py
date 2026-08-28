@@ -7,7 +7,7 @@ from html import escape
 
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request, logger
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
