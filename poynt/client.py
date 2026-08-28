@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 
 import httpx
 
@@ -240,6 +240,15 @@ class PoyntClient:
 
         limit = max(1, min(limit, 100))
 
+        now = datetime.now().astimezone()
+        midnight = datetime.combine(
+            now.date(),
+            time.min,
+            tzinfo=now.tzinfo,
+        )
+
+        start_at = int(midnight.timestamp())        
+
         logger.info(
             "Poynt recent orders request starting: "
             "limit=%d.",
@@ -253,6 +262,7 @@ class PoyntClient:
 
         params = {
             "limit": limit,
+            "startAt": start_at
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
