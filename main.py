@@ -4,6 +4,7 @@ import os
 import secrets
 from urllib.parse import urlencode
 
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,8 +13,8 @@ from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
 from auth import hash_password, verify_password
-from database import SessionLocal
-from models import User
+from database import Base, SessionLocal, engine
+from models import User, PoyntConnection
 
 load_dotenv()
 
@@ -22,6 +23,7 @@ POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 POYNT_REDIRECT_URI = os.environ["POYNT_REDIRECT_URI"]
 
 app = FastAPI(title="Codelian Poynt")
+Base.metadata.create_all(bind=engine)
 
 is_production = os.getenv("ENVIRONMENT") == "production"
 
@@ -280,22 +282,27 @@ async def oauth_callback(
             code=code,
             redirect_uri=POYNT_REDIRECT_URI,
         )
-        
+
         access_token = token_response["accessToken"]
+
     except Exception as e:
-        print(f"Poynt token request failed: {type(e).__name__}: {e}", flush=True)
+        print(
+            f"Poynt token request failed: {type(e).__name__}: {e}",
+            flush=True
+        )
 
         return HTMLResponse(
-            f"""
+            """
             <h1>Poynt Token Error</h1>
             <p>
-                Poynt authorization succeeded, but the merchant token request failed.
+                Poynt authorization succeeded, but the
+                merchant token request failed.
             </p>
             <p>
                 Check the Render/application logs.
             </p>
             """,
-            status_code=502,
+            status_code=502
         )
 
     if not businessId:
@@ -304,6 +311,53 @@ async def oauth_callback(
             "<p>No business ID was returned.</p>",
             status_code=400,
         )
+
+    with SessionLocal() as session:
+        connection = session.query(PoyntConnection).filter(
+            PoyntConnection.user_id == user_id
+        ).one_or_none()
+
+        if connection:
+            connection.business_id = businessId
+            connection.access_token = access_token
+            connection.refresh_token = token_response.get("refreshToken")
+            connection.token_type = token_response.get("tokenType")
+
+            expires_in = token_response.get("expiresIn")
+
+            if expires_in:
+                from datetime import datetime, timedelta
+
+                connection.expires_at = (
+                    datetime.utcnow()
+                    + timedelta(seconds=int(expires_in))
+                )
+
+        else:
+            from datetime import datetime, timedelta
+
+            expires_in = token_response.get("expiresIn")
+
+            expires_at = None
+
+            if expires_in:
+                expires_at = (
+                    datetime.utcnow()
+                    + timedelta(seconds=int(expires_in))
+                )
+
+            connection = PoyntConnection(
+                user_id=user_id,
+                business_id=businessId,
+                access_token=access_token,
+                refresh_token=token_response.get("refreshToken"),
+                token_type=token_response.get("tokenType"),
+                expires_at=expires_at,
+            )
+
+            session.add(connection)
+
+        session.commit()
 
     catalogs = await get_catalogs(
         access_token,
