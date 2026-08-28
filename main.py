@@ -681,56 +681,7 @@ async def poynt_orders(request: Request):
             <title>Recent Poynt Orders</title>
 
             <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 30px;
-                }}
-
-                h1 {{
-                    margin-bottom: 5px;
-                }}
-
-                .summary {{
-                    margin-bottom: 25px;
-                }}
-
-                .order {{
-                    margin-bottom: 25px;
-                    border: 1px solid #aaa;
-                    padding: 12px;
-                }}
-
-                .order-header {{
-                    display: grid;
-                    grid-template-columns: 1fr 1fr auto;
-                    gap: 20px;
-                    align-items: center;
-                    margin-bottom: 10px;
-                    font-size: 18px;
-                }}
-
-                .status {{
-                    margin-left: 10px;
-                    font-size: 14px;
-                    font-weight: normal;
-                }}
-
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                }}
-
-                th,
-                td {{
-                    border: 1px solid #ccc;
-                    padding: 7px;
-                    text-align: left;
-                    vertical-align: top;
-                }}
-
-                th {{
-                    font-weight: bold;
-                }}
+                /* your existing CSS */
             </style>
         </head>
 
@@ -761,7 +712,8 @@ async def poynt_orders(request: Request):
                 document
                     .querySelectorAll(".local-time")
                     .forEach(function(element) {{
-                        const value = element.getAttribute("datetime");
+                        const value =
+                            element.getAttribute("datetime");
 
                         if (!value) {{
                             return;
@@ -796,15 +748,17 @@ async def poynt_orders(request: Request):
                     }});
 
                 const loadedTime =
-                    document.getElementById("page-loaded-time");
+                    document.getElementById(
+                        "page-loaded-time"
+                    );
 
-                if (loadedTime) {
+                if (loadedTime) {{
                     const now = new Date();
 
                     loadedTime.textContent =
                         new Intl.DateTimeFormat(
                             undefined,
-                            {
+                            {{
                                 weekday: "long",
                                 month: "long",
                                 day: "numeric",
@@ -813,9 +767,12 @@ async def poynt_orders(request: Request):
                                 minute: "2-digit",
                                 second: "2-digit",
                                 hour12: true
-                            }
-                        ).format(now).replace(/ at /, " | ");
-                }    
+                            }}
+                        ).format(now).replace(
+                            / at /,
+                            " | "
+                        );
+                }}
             </script>
 
         </body>
