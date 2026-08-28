@@ -311,7 +311,7 @@ async def oauth_callback(
         access_token = token_response["accessToken"]
 
     except Exception as e:
-        logger.exception(
+        logger.error(
             "Poynt catalog request failed: %s",
             e,
         )
@@ -489,7 +489,7 @@ async def poynt_orders(request: Request):
         )
 
     except Exception as e:
-        logger.exception(
+        logger.error(
             "Poynt recent orders request failed: %s",
             e,
         )
