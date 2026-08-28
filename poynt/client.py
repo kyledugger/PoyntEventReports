@@ -132,8 +132,7 @@ class PoyntClient:
         # - the token is inside the configured refresh window
 
         logger.info(
-            "Poynt access token is within refresh window; "
-            "refreshing before API request."
+            "Poynt access token refresh starting."
         )
 
         if not self.refresh_token:
