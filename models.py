@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -38,12 +38,18 @@ class User(Base):
 
 class PoyntConnection(Base):
     __tablename__ = "poynt_connections"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "business_id",
+            name="uq_poynt_connection_user_business"
+        ),
+    )    
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"),
-        unique=True,
         nullable=False,
         index=True
     )
