@@ -32,6 +32,8 @@ load_dotenv()
 from logging_config import configure_logging
 
 import logging
+logger = logging.getLogger(__name__)
+
 configure_logging()
 
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
@@ -792,6 +794,7 @@ async def poynt_orders(request: Request):
                                 " | "
                             );
                     }});
+
                 const loadedTime =
                     document.getElementById("page-loaded-time");
 
