@@ -103,3 +103,46 @@ async def exchange_authorization_code(
 
     return response.json()
 
+
+
+async def refresh_access_token(
+    refresh_token: str,
+) -> dict:
+    """
+    Refresh an active Poynt authorization.
+
+    Poynt's refresh flow uses the existing refresh token and does
+    not require the application's self-signed JWT.
+    """
+
+    poynt_token_url = os.environ["POYNT_TOKEN_URL"]
+
+    headers = {
+        "Accept": "application/json",
+        "api-version": "1.2",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Poynt-Request-Id": str(uuid.uuid4()),
+    }
+
+    data = {
+        "grantType": "REFRESH_TOKEN",
+        "refreshToken": refresh_token,
+    }
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            poynt_token_url,
+            headers=headers,
+            data=data,
+        )
+
+    if not response.is_success:
+        print("Poynt token refresh failed:")
+        print("  HTTP status:", response.status_code)
+        print("  Refresh token present:", bool(refresh_token))
+        print("  Refresh token length:", len(refresh_token))
+        print("  Response:", response.text)
+
+        response.raise_for_status()
+
+    return response.json()

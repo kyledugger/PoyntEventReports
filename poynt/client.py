@@ -1,29 +1,160 @@
+import os
+from datetime import datetime, timedelta, timezone
+
 import httpx
 
-from poynt.connection import PoyntCredentials
+from poynt.connection import PoyntCredentials, save_poynt_connection
+from poynt.token import refresh_access_token
 
 
 class PoyntAPIError(Exception):
     """Raised when a Poynt API request fails."""
 
 
+class PoyntReauthorizationRequired(PoyntAPIError):
+    """Raised when the Poynt authorization has expired."""
+
+
 class PoyntClient:
     BASE_URL = "https://services.poynt.net"
     API_VERSION = "1.2"
 
-    def __init__(self, credentials: PoyntCredentials):
+    def __init__(
+        self,
+        credentials: PoyntCredentials,
+        user_id: int,
+    ):
+        self.user_id = user_id
         self.business_id = credentials.business_id
         self.access_token = credentials.access_token
+        self.refresh_token = credentials.refresh_token
         self.token_type = credentials.token_type or "BEARER"
+        self.expires_at = credentials.expires_at
+
+        self.refresh_window = timedelta(
+            seconds=int(
+                os.getenv(
+                    "POYNT_TOKEN_REFRESH_WINDOW_SECONDS",
+                    "600",
+                )
+            )
+        )
 
     def _headers(self) -> dict[str, str]:
         return {
             "Accept": "application/json",
             "api-version": self.API_VERSION,
-            "Authorization": f"{self.token_type} {self.access_token}",
+            "Authorization": (
+                f"{self.token_type} {self.access_token}"
+            ),
         }
 
+    def _expiration_state(self) -> str:
+        """
+        Return one of:
+
+        - "valid": outside the refresh window
+        - "refresh": inside the refresh window
+        - "expired": already expired
+        """
+
+        if not self.expires_at:
+            raise PoyntAPIError(
+                "Poynt access token has no expiration time."
+            )
+
+        now = datetime.now(timezone.utc)
+        expires_at = self.expires_at
+
+        # PostgreSQL may return a naive datetime depending on
+        # the database column configuration.
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(
+                tzinfo=timezone.utc
+            )
+
+        if now >= expires_at:
+            return "expired"
+
+        if now + self.refresh_window >= expires_at:
+            return "refresh"
+
+        return "valid"
+
+    async def _refresh_if_needed(self) -> None:
+        state = self._expiration_state()
+
+        if state == "valid":
+            return
+
+        if state == "expired":
+            raise PoyntReauthorizationRequired(
+                "The Poynt authorization has expired. "
+                "The merchant must reconnect Poynt."
+            )
+
+        # From this point forward we know:
+        # - the token is not expired
+        # - the token is inside the configured refresh window
+
+        if not self.refresh_token:
+            raise PoyntReauthorizationRequired(
+                "The Poynt access token is near expiration, "
+                "but no refresh token is available. "
+                "The merchant must reconnect Poynt."
+            )
+
+        token_response = await refresh_access_token(
+            self.refresh_token
+        )
+
+        access_token = token_response.get("accessToken")
+        refresh_token = token_response.get("refreshToken")
+        token_type = token_response.get("tokenType")
+        expires_in = token_response.get("expiresIn")
+
+        if not access_token:
+            raise PoyntAPIError(
+                "Poynt refresh response did not contain "
+                "an access token."
+            )
+
+        if not refresh_token:
+            raise PoyntAPIError(
+                "Poynt refresh response did not contain "
+                "a refresh token."
+            )
+
+        if expires_in is None:
+            raise PoyntAPIError(
+                "Poynt refresh response did not contain "
+                "expiresIn."
+            )
+
+        expires_at = (
+            datetime.now(timezone.utc)
+            + timedelta(seconds=int(expires_in))
+        )
+
+        # Update the in-memory client first.
+        self.access_token = access_token
+        self.refresh_token = refresh_token
+        self.token_type = token_type or self.token_type
+        self.expires_at = expires_at
+
+        # Then persist the complete new credential set.
+        save_poynt_connection(
+            user_id=self.user_id,
+            business_id=self.business_id,
+            access_token=self.access_token,
+            refresh_token=self.refresh_token,
+            token_type=self.token_type,
+            expires_at=self.expires_at,
+        )
+
     async def get_catalogs(self) -> dict:
+        await self._refresh_if_needed()
+
         url = (
             f"{self.BASE_URL}"
             f"/businesses/{self.business_id}/catalogs"
@@ -37,7 +168,8 @@ class PoyntClient:
 
         if not response.is_success:
             raise PoyntAPIError(
-                f"Poynt API returned HTTP {response.status_code}"
+                f"Poynt API returned HTTP "
+                f"{response.status_code}"
             )
 
         return response.json()

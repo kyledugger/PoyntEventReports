@@ -1,5 +1,4 @@
 from poynt.token import exchange_authorization_code
-from poynt.client import PoyntClient
 
 import os
 import secrets
@@ -20,6 +19,11 @@ from poynt.connection import (
     get_poynt_connection,
     get_poynt_credentials,
     save_poynt_connection,
+)
+
+from poynt.client import (
+    PoyntClient,
+    PoyntReauthorizationRequired,
 )
 
 load_dotenv()
@@ -376,10 +380,28 @@ async def poynt_catalog(request: Request):
             status_code=404
         )
 
-    client = PoyntClient(credentials)
-
     try:
+        client = PoyntClient(
+            credentials,
+            user_id=user_id,
+        )
+
         catalogs = await client.get_catalogs()
+        
+    except PoyntReauthorizationRequired:
+        return HTMLResponse(
+            """
+            <h1>Poynt Authorization Required</h1>
+            <p>
+                Your Poynt authorization has expired.
+                Please reconnect your Poynt account.
+            </p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=401,
+        )
 
     except Exception as e:
         print(
