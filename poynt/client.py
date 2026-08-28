@@ -231,56 +231,56 @@ class PoyntClient:
 
         return response.json()
     
-async def get_recent_orders(self, limit: int = 50) -> list[dict]:
-    """
-    Get the most recent orders for this business.
-    """
+    async def get_recent_orders(self, limit: int = 50) -> list[dict]:
+        """
+        Get the most recent orders for this business.
+        """
 
-    await self._refresh_if_needed()
+        await self._refresh_if_needed()
 
-    limit = max(1, min(limit, 100))
+        limit = max(1, min(limit, 100))
 
-    logger.info(
-        "Poynt recent orders request starting: "
-        "limit=%d.",
-        limit,
-    )
-
-    url = (
-        f"{self.BASE_URL}"
-        f"/businesses/{self.business_id}/orders"
-    )
-
-    params = {
-        "limit": limit,
-    }
-
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(
-            url,
-            headers=self._headers(),
-            params=params,
+        logger.info(
+            "Poynt recent orders request starting: "
+            "limit=%d.",
+            limit,
         )
 
-    if not response.is_success:
-        logger.error(
-            "Poynt recent orders request failed: HTTP %d",
+        url = (
+            f"{self.BASE_URL}"
+            f"/businesses/{self.business_id}/orders"
+        )
+
+        params = {
+            "limit": limit,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                url,
+                headers=self._headers(),
+                params=params,
+            )
+
+        if not response.is_success:
+            logger.error(
+                "Poynt recent orders request failed: HTTP %d",
+                response.status_code,
+            )
+
+            raise PoyntAPIError(
+                f"Poynt API returned HTTP "
+                f"{response.status_code}"
+            )
+
+        data = response.json()
+        orders = data.get("orders", [])
+
+        logger.info(
+            "Poynt recent orders request succeeded: "
+            "HTTP %d, orders_received=%d.",
             response.status_code,
+            len(orders),
         )
 
-        raise PoyntAPIError(
-            f"Poynt API returned HTTP "
-            f"{response.status_code}"
-        )
-
-    data = response.json()
-    orders = data.get("orders", [])
-
-    logger.info(
-        "Poynt recent orders request succeeded: "
-        "HTTP %d, orders_received=%d.",
-        response.status_code,
-        len(orders),
-    )
-
-    return orders
+        return orders
