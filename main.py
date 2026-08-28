@@ -3,6 +3,7 @@ from poynt.token import exchange_authorization_code
 import os
 import secrets
 from urllib.parse import urlencode
+from html import escape
 
 
 from dotenv import load_dotenv
@@ -505,33 +506,49 @@ async def poynt_orders(request: Request):
             status_code=502
         )
 
-    # Poynt returns orders with timestamps in ISO 8601/GMT.
-    # Sort newest first for display.
+    # Newest first.
     orders = sorted(
         orders,
         key=lambda order: order.get("createdAt", ""),
         reverse=True,
     )
 
-    rows = []
+    order_sections = []
 
     for order in orders:
-        order_number = order.get(
-            "orderNumber",
-            order.get("id", "Unknown")
+        order_number = escape(
+            str(
+                order.get(
+                    "orderNumber",
+                    order.get("id", "Unknown")
+                )
+            )
         )
 
-        created_at = order.get(
-            "createdAt",
-            "Unknown"
+        created_at = escape(
+            str(order.get("createdAt", ""))
+        )
+
+        # Poynt's statuses object is documented as OrderStatuses.
+        # We don't assume a single exact structure here.
+        statuses = order.get("statuses") or {}
+
+        status = (
+            statuses.get("status")
+            if isinstance(statuses, dict)
+            else None
+        )
+
+        status_display = escape(
+            str(status or "Unknown")
         )
 
         amounts = order.get("amounts") or {}
 
-        total = amounts.get(
-            "netTotal",
-            amounts.get("orderAmount")
-        )
+        total = amounts.get("netTotal")
+
+        if total is None:
+            total = amounts.get("orderAmount")
 
         currency = amounts.get(
             "currency",
@@ -539,32 +556,113 @@ async def poynt_orders(request: Request):
         )
 
         if total is not None:
-            total_display = (
-                f"{currency} "
-                f"${total / 100:.2f}"
-            )
+            try:
+                total_display = (
+                    f"{escape(str(currency))} "
+                    f"${int(total) / 100:.2f}"
+                )
+            except (TypeError, ValueError):
+                total_display = escape(str(total))
         else:
             total_display = "Unknown"
 
-        rows.append(
+        items = order.get("items") or []
+
+        item_rows = []
+
+        for item in items:
+            name = escape(
+                str(item.get("name") or "")
+            )
+
+            quantity = escape(
+                str(item.get("quantity") or "")
+            )
+
+            details = escape(
+                str(item.get("details") or "")
+            )
+
+            sku = escape(
+                str(item.get("sku") or "")
+            )
+
+            product_id = escape(
+                str(item.get("productId") or "")
+            )
+
+            item_rows.append(
+                f"""
+                <tr>
+                    <td>{name}</td>
+                    <td>{quantity}</td>
+                    <td>{details}</td>
+                    <td>{sku}</td>
+                    <td>{product_id}</td>
+                </tr>
+                """
+            )
+
+        if item_rows:
+            items_html = "\n".join(item_rows)
+        else:
+            items_html = """
+                <tr>
+                    <td colspan="5">
+                        No order items.
+                    </td>
+                </tr>
+            """
+
+        order_sections.append(
             f"""
-            <tr>
-                <td>{order_number}</td>
-                <td>{created_at}</td>
-                <td>{total_display}</td>
-            </tr>
+            <section class="order">
+                <div class="order-header">
+                    <div>
+                        <strong>Order {order_number}</strong>
+                        <span class="status">
+                            {status_display}
+                        </span>
+                    </div>
+
+                    <div>
+                        <time
+                            class="local-time"
+                            datetime="{created_at}"
+                        >
+                            {created_at}
+                        </time>
+                    </div>
+
+                    <div>
+                        <strong>{total_display}</strong>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Qty</th>
+                            <th>Details</th>
+                            <th>SKU</th>
+                            <th>Product ID</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+            </section>
             """
         )
 
-    rows_html = "\n".join(rows)
-
-    if not rows_html:
-        rows_html = """
-            <tr>
-                <td colspan="3">
-                    No completed orders found.
-                </td>
-            </tr>
+    if order_sections:
+        orders_html = "\n".join(order_sections)
+    else:
+        orders_html = """
+            <p>No orders were returned.</p>
         """
 
     return HTMLResponse(
@@ -573,36 +671,118 @@ async def poynt_orders(request: Request):
         <html>
         <head>
             <title>Recent Poynt Orders</title>
+
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    margin: 30px;
+                }}
+
+                h1 {{
+                    margin-bottom: 5px;
+                }}
+
+                .summary {{
+                    margin-bottom: 25px;
+                }}
+
+                .order {{
+                    margin-bottom: 25px;
+                    border: 1px solid #aaa;
+                    padding: 12px;
+                }}
+
+                .order-header {{
+                    display: grid;
+                    grid-template-columns: 1fr 1fr auto;
+                    gap: 20px;
+                    align-items: center;
+                    margin-bottom: 10px;
+                    font-size: 18px;
+                }}
+
+                .status {{
+                    margin-left: 10px;
+                    font-size: 14px;
+                    font-weight: normal;
+                }}
+
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                }}
+
+                th,
+                td {{
+                    border: 1px solid #ccc;
+                    padding: 7px;
+                    text-align: left;
+                    vertical-align: top;
+                }}
+
+                th {{
+                    font-weight: bold;
+                }}
+            </style>
         </head>
 
         <body>
+
             <h1>Recent Poynt Orders</h1>
 
-            <p>
+            <p class="summary">
                 Showing the most recent
                 {len(orders)}
-                completed orders.
+                orders.
             </p>
 
-            <table border="1" cellpadding="6">
-                <thead>
-                    <tr>
-                        <th>Order</th>
-                        <th>Created</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
+            {orders_html}
 
             <p>
                 <a href="/dashboard">
                     Return to Dashboard
                 </a>
             </p>
+
+            <script>
+                document
+                    .querySelectorAll(".local-time")
+                    .forEach(function(element) {{
+                        const value = element.getAttribute("datetime");
+
+                        if (!value) {{
+                            return;
+                        }}
+
+                        const date = new Date(value);
+
+                        if (isNaN(date.getTime())) {{
+                            return;
+                        }}
+
+                        const formatted =
+                            new Intl.DateTimeFormat(
+                                undefined,
+                                {{
+                                    weekday: "long",
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                    hour12: true
+                                }}
+                            ).format(date);
+
+                        element.textContent =
+                            formatted.replace(
+                                / at /,
+                                " | "
+                            );
+                    }});
+            </script>
+
         </body>
         </html>
         """
