@@ -742,6 +742,11 @@ async def poynt_orders(request: Request):
                 orders.
             </p>
 
+            <p>
+                Loaded:
+                <time id="page-loaded-time"></time>
+            </p>
+
             {orders_html}
 
             <p>
@@ -787,6 +792,27 @@ async def poynt_orders(request: Request):
                                 " | "
                             );
                     }});
+                const loadedTime =
+                    document.getElementById("page-loaded-time");
+
+                if (loadedTime) {
+                    const now = new Date();
+
+                    loadedTime.textContent =
+                        new Intl.DateTimeFormat(
+                            undefined,
+                            {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                                second: "2-digit",
+                                hour12: true
+                            }
+                        ).format(now).replace(/ at /, " | ");
+                }    
             </script>
 
         </body>
