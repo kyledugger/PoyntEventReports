@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Request, logger
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -310,9 +310,9 @@ async def oauth_callback(
         access_token = token_response["accessToken"]
 
     except Exception as e:
-        print(
-            f"Poynt token request failed: {type(e).__name__}: {e}",
-            flush=True
+        logger.exception(
+            "Poynt catalog request failed: %s",
+            e,
         )
 
         return HTMLResponse(
@@ -437,6 +437,174 @@ async def poynt_catalog(request: Request):
         <p>
             <a href="/dashboard">Return to Dashboard</a>
         </p>
+        """
+    )
+
+@app.get("/poynt/orders", response_class=HTMLResponse)
+async def poynt_orders(request: Request):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    credentials = get_poynt_credentials(user_id)
+
+    if not credentials:
+        return HTMLResponse(
+            """
+            <h1>Poynt Error</h1>
+            <p>No Poynt connection was found.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=404
+        )
+
+    try:
+        client = PoyntClient(
+            credentials,
+            user_id=user_id,
+        )
+
+        orders = await client.get_recent_orders(50)
+
+    except PoyntReauthorizationRequired:
+        return HTMLResponse(
+            """
+            <h1>Poynt Authorization Required</h1>
+            <p>
+                Your Poynt authorization has expired.
+                Please reconnect your Poynt account.
+            </p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=401,
+        )
+
+    except Exception as e:
+        logger.exception(
+            "Poynt recent orders request failed: %s",
+            e,
+        )
+
+        return HTMLResponse(
+            """
+            <h1>Poynt Orders Error</h1>
+            <p>The recent orders request failed.</p>
+            <p>Check the application logs.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=502
+        )
+
+    # Poynt returns orders with timestamps in ISO 8601/GMT.
+    # Sort newest first for display.
+    orders = sorted(
+        orders,
+        key=lambda order: order.get("createdAt", ""),
+        reverse=True,
+    )
+
+    rows = []
+
+    for order in orders:
+        order_number = order.get(
+            "orderNumber",
+            order.get("id", "Unknown")
+        )
+
+        created_at = order.get(
+            "createdAt",
+            "Unknown"
+        )
+
+        amounts = order.get("amounts") or {}
+
+        total = amounts.get(
+            "netTotal",
+            amounts.get("orderAmount")
+        )
+
+        currency = amounts.get(
+            "currency",
+            "USD"
+        )
+
+        if total is not None:
+            total_display = (
+                f"{currency} "
+                f"${total / 100:.2f}"
+            )
+        else:
+            total_display = "Unknown"
+
+        rows.append(
+            f"""
+            <tr>
+                <td>{order_number}</td>
+                <td>{created_at}</td>
+                <td>{total_display}</td>
+            </tr>
+            """
+        )
+
+    rows_html = "\n".join(rows)
+
+    if not rows_html:
+        rows_html = """
+            <tr>
+                <td colspan="3">
+                    No completed orders found.
+                </td>
+            </tr>
+        """
+
+    return HTMLResponse(
+        f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Recent Poynt Orders</title>
+        </head>
+
+        <body>
+            <h1>Recent Poynt Orders</h1>
+
+            <p>
+                Showing the most recent
+                {len(orders)}
+                completed orders.
+            </p>
+
+            <table border="1" cellpadding="6">
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Created</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+
+            <p>
+                <a href="/dashboard">
+                    Return to Dashboard
+                </a>
+            </p>
+        </body>
+        </html>
         """
     )
 
