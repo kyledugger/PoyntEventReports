@@ -557,13 +557,12 @@ def get_order_intervals(orders):
     
 
 def get_item_flow(orders):
-    # Count total item quantity in one-minute buckets.
-    # Each bucket is keyed by the local-independent UTC minute
-    # represented by the order timestamp.
-
     chronological_orders = list(reversed(orders))
 
     item_flow = {}
+
+    first_bucket = None
+    last_bucket = None
 
     for order in chronological_orders:
         created_at = order.get("createdAt")
@@ -578,8 +577,18 @@ def get_item_flow(orders):
         except (TypeError, ValueError):
             continue
 
-        # Normalize to the beginning of the minute.
-        minute = order_time.replace(second=0, microsecond=0)
+        bucket_minute = (order_time.minute // 5) * 5
+
+        bucket_time = order_time.replace(
+            minute=bucket_minute,
+            second=0,
+            microsecond=0
+        )
+
+        if first_bucket is None:
+            first_bucket = bucket_time
+
+        last_bucket = bucket_time
 
         total_items = 0
 
@@ -591,17 +600,28 @@ def get_item_flow(orders):
             except (TypeError, ValueError):
                 continue
 
-        item_flow[minute] = (
-            item_flow.get(minute, 0) + total_items
+        item_flow[bucket_time] = (
+            item_flow.get(bucket_time, 0) + total_items
         )
 
-    return [
-        {
-            "time": minute.isoformat(),
-            "items": quantity,
-        }
-        for minute, quantity in sorted(item_flow.items())
-    ]    
+    if first_bucket is None:
+        return []
+
+    # Fill every five-minute bucket, including zero-activity buckets.
+    result = []
+
+    bucket_time = first_bucket
+
+    while bucket_time <= last_bucket:
+        result.append({
+            "time": bucket_time.isoformat(),
+            "items": item_flow.get(bucket_time, 0),
+        })
+
+        bucket_time += timedelta(minutes=5)
+
+    return result
+
 
 def get_prefix_rows(prefix_counts):
     prefix_rows = []
@@ -1357,6 +1377,8 @@ async def poynt_orders(request: Request):
                                 tooltip: {{
                                     callbacks: {{
                                         title: function(context) {{
+                                            const date = new Date(context[0].parsed.x);
+
                                             return new Intl.DateTimeFormat(
                                                 undefined,
                                                 {{
@@ -1365,18 +1387,16 @@ async def poynt_orders(request: Request):
                                                     day: "numeric",
                                                     hour: "numeric",
                                                     minute: "2-digit",
-                                                    second: "2-digit",
                                                     hour12: true
                                                 }}
-                                            ).format(context[0].parsed.x);
+                                            ).format(date);
                                         }},
 
                                         label: function(context) {{
-                                            return context.parsed.y.toFixed(1)
-                                                + " seconds since previous order";
+                                            return context.parsed.y + " items ordered";
                                         }}
                                     }}
-                                }}
+                                }}                            
                             }},
 
                             scales: {{
@@ -1384,7 +1404,16 @@ async def poynt_orders(request: Request):
                                     type: "time",
 
                                     time: {{
-                                        tooltipFormat: "MMM d, h:mm:ss a"
+                                        unit: "minute",
+                                        stepSize: 5,
+                                        displayFormats: {{
+                                            minute: "h:mm a"
+                                        }},
+                                        tooltipFormat: "h:mm a"
+                                    }},
+
+                                    ticks: {{
+                                        stepSize: 5
                                     }},
 
                                     title: {{
@@ -1418,12 +1447,15 @@ async def poynt_orders(request: Request):
                         data: {{
                             datasets: [{{
                                 label: "Items Ordered",
+                                
                                 data: itemFlowData.map(function(point) {{
                                     return {{
                                         x: new Date(point.time),
                                         y: point.items
                                     }};
-                                }})
+                                }}),
+
+                                barThickness: "flex"
                             }}]
                         }},
 
@@ -1479,7 +1511,7 @@ async def poynt_orders(request: Request):
 
                                     title: {{
                                         display: true,
-                                        text: "Items per Minute"
+                                        text: "Items per 5 Minutes"
                                     }}
                                 }}
                             }}
