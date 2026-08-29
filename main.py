@@ -474,7 +474,7 @@ async def poynt_orders(request: Request):
             user_id=user_id,
         )
 
-        orders = await client.get_recent_orders(50)
+        orders = await client.get_recent_orders(100)
 
     except PoyntReauthorizationRequired:
         return HTMLResponse(
@@ -516,6 +516,58 @@ async def poynt_orders(request: Request):
         reverse=True,
     )
 
+    # Count units ordered by SKU across the displayed orders.
+    sku_counts = {}
+
+    for order in orders:
+        items = order.get("items") or []
+
+        for item in items:
+            sku = item.get("sku")
+
+            if not sku:
+                continue
+
+            quantity = item.get("quantity", 0)
+
+            try:
+                quantity = float(quantity)
+            except (TypeError, ValueError):
+                quantity = 0
+
+            sku_counts[sku] = (
+                sku_counts.get(sku, 0) + quantity
+            )    
+    sku_rows = []
+
+    for sku, quantity in sorted(
+        sku_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        sku_rows.append(
+            f"""
+            <tr>
+                <td>{escape(str(sku))}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )
+
+    if sku_rows:
+        sku_html = "\n".join(sku_rows)
+    else:
+        sku_html = """
+            <tr>
+                <td colspan="2">
+                    No SKU data available.
+                </td>
+            </tr>
+        """
     order_sections = []
 
     for order in orders:
@@ -606,8 +658,7 @@ async def poynt_orders(request: Request):
                     <td>{details}</td>
                     <td>{sku}</td>
                     <td>{clientNotes}</td>
-  
-                </tr>
+                  </tr>
                 """
             )
 
@@ -665,7 +716,7 @@ async def poynt_orders(request: Request):
             </section>
             """
         )
-
+    logger.info(orders)
     if order_sections:
         orders_html = "\n".join(order_sections)
     else:
@@ -731,12 +782,40 @@ async def poynt_orders(request: Request):
                 th {{
                     font-weight: bold;
                 }}
+                .sku-summary {{
+                    margin-bottom: 30px;
+                }}
+
+                .sku-summary table {{
+                    width: 400px;
+                }}
+
+                .sku-summary th,
+                .sku-summary td {{
+                    padding: 7px;
+                }}                
             </style>
         </head>
 
         <body>
 
             <h1>Recent Poynt Orders</h1>
+            <div class="sku-summary">
+                <h2>Items Ordered</h2>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Units</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {sku_html}
+                    </tbody>
+                </table>
+            </div>            
 
             <p class="summary">
                 Showing the most recent
