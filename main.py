@@ -516,6 +516,48 @@ async def poynt_orders(request: Request):
         reverse=True,
     )
 
+    # Determine the time span represented by the orders.
+    oldest_order_at = None
+    newest_order_at = None
+    order_span_minutes = None
+
+    order_times = []
+
+    for order in orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            order_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+            order_times.append(order_time)
+        except (TypeError, ValueError):
+            continue
+
+    if order_times:
+        oldest_order_at = min(order_times)
+        newest_order_at = max(order_times)
+
+        order_span_minutes = (
+            newest_order_at - oldest_order_at
+        ).total_seconds() / 60
+
+    if oldest_order_at and newest_order_at:
+        oldest_order_iso = oldest_order_at.isoformat()
+        newest_order_iso = newest_order_at.isoformat()
+
+        if order_span_minutes.is_integer():
+            order_span_display = str(int(order_span_minutes))
+        else:
+            order_span_display = f"{order_span_minutes:.1f}"
+    else:
+        oldest_order_iso = ""
+        newest_order_iso = ""
+        order_span_display = "Unknown"        
+
     category_map = {
         "ENE": "Drinks",
         "N": "Drinks",
@@ -529,6 +571,7 @@ async def poynt_orders(request: Request):
         "SHV": "Shave Ice",
         "COF": "Coffee",
         "CF": "Coffee",
+        "WATER": "Water",
         "WTR": "Water"
     }  
 
@@ -911,6 +954,37 @@ async def poynt_orders(request: Request):
         <body>
 
             <h1>Recent Poynt Orders</h1>
+
+            <p class="summary">
+                Showing the most recent
+                {len(orders)}
+                orders.
+            </p>
+
+            <p>
+                Orders span:
+                <strong>
+                    <time
+                        class="local-time"
+                        datetime="{oldest_order_iso}"
+                    >{oldest_order_iso}</time>
+                </strong>
+                through
+                <strong>
+                    <time
+                        class="local-time"
+                        datetime="{newest_order_iso}"
+                    >{newest_order_iso}</time>
+                </strong>
+                |
+                <strong>{order_span_display} minutes</strong>
+            </p>            
+
+            <p>
+                Loaded:
+                <time id="page-loaded-time"></time>
+            </p>
+
             <div class="reports">
                 <div class="report">
                     <h2>Items Ordered</h2>
@@ -946,17 +1020,7 @@ async def poynt_orders(request: Request):
                     </table>
                 </div>
             </div>        
-
-            <p class="summary">
-                Showing the most recent
-                {len(orders)}
-                orders.
-            </p>
-
-            <p>
-                Loaded:
-                <time id="page-loaded-time"></time>
-            </p>
+            
 
             {orders_html}
 
