@@ -519,6 +519,9 @@ async def poynt_orders(request: Request):
     # Count units ordered by SKU across the displayed orders.
     sku_counts = {}
 
+    # Count units ordered by SKU prefix/category.
+    prefix_counts = {}
+
     for order in orders:
         items = order.get("items") or []
 
@@ -535,9 +538,47 @@ async def poynt_orders(request: Request):
             except (TypeError, ValueError):
                 quantity = 0
 
+            # SKU count
             sku_counts[sku] = (
                 sku_counts.get(sku, 0) + quantity
-            )    
+            )
+
+            # Prefix/category count
+            if "-" in sku:
+                prefix = sku.split("-", 1)[0]
+                prefix_counts[prefix] = (
+                    prefix_counts.get(prefix, 0) + quantity
+                )  
+    prefix_rows = []
+
+    for prefix, quantity in sorted(
+        prefix_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        prefix_rows.append(
+            f"""
+            <tr>
+                <td>{escape(str(prefix))}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )
+
+    if prefix_rows:
+        prefix_html = "\n".join(prefix_rows)
+    else:
+        prefix_html = """
+            <tr>
+                <td colspan="2">
+                    No category data available.
+                </td>
+            </tr>
+        """
     sku_rows = []
 
     for sku, quantity in sorted(
@@ -793,29 +834,62 @@ async def poynt_orders(request: Request):
                 .sku-summary th,
                 .sku-summary td {{
                     padding: 7px;
-                }}                
+                }} 
+                .reports {{
+                    display: flex;
+                    gap: 30px;
+                    align-items: flex-start;
+                    margin-bottom: 30px;
+                }}
+
+                .report {{
+                    width: 400px;
+                }}
+
+                .report h2 {{
+                    margin-bottom: 10px;
+                }}                               
             </style>
         </head>
 
         <body>
 
             <h1>Recent Poynt Orders</h1>
-            <div class="sku-summary">
-                <h2>Items Ordered</h2>
+            <div class="reports">
+                <div class="report">
+                    <h2>Items Ordered</h2>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Units</th>
-                        </tr>
-                    </thead>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Units</th>
+                            </tr>
+                        </thead>
 
-                    <tbody>
-                        {sku_html}
-                    </tbody>
-                </table>
-            </div>            
+                        <tbody>
+                            {sku_html}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="report">
+                    <h2>Categories</h2>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Units</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {prefix_html}
+                        </tbody>
+                    </table>
+                </div>
+            </div>          
 
             <p class="summary">
                 Showing the most recent
