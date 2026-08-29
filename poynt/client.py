@@ -262,7 +262,7 @@ class PoyntClient:
 
         params = {
             "limit": limit,
-            "startAt": start_at
+            "startTimeSec": start_at
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
