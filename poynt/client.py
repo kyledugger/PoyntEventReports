@@ -262,7 +262,7 @@ class PoyntClient:
 
         params = {
             "limit": limit,
-            "start_at": start_at
+            "start_at": start_at,
             "startAt": start_at
         }
 
