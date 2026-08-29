@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, timezone, time
+from datetime import datetime, timedelta, timezone, time, ZoneInfo
 
 import httpx
 
@@ -247,7 +247,6 @@ class PoyntClient:
             tzinfo=now.tzinfo,
         )
 
-        start_at = midnight.strftime("%Y-%m-%dT%H:%M:%SZ")    
 
         logger.info(
             "Poynt recent orders request starting: "
@@ -260,9 +259,32 @@ class PoyntClient:
             f"/businesses/{self.business_id}/orders"
         )
 
+        local_now = datetime.now(ZoneInfo("America/Phoenix"))
+
+        local_midnight = datetime.combine(
+            local_now.date(),
+            time.min,
+            tzinfo=local_now.tzinfo,
+        )
+
+        start_at = local_midnight.astimezone(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )        
+
+        start_at = local_midnight.astimezone(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        logger.info(
+            "Poynt recent orders request starting: "
+            "limit=%d, start_at=%s.",
+            limit,
+            start_at,
+        )
+
         params = {
             "limit": limit,
-            "start_at": start_at
+            "startAt": start_at,
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
