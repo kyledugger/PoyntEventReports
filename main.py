@@ -907,7 +907,6 @@ async def poynt_orders(request: Request):
                         {items_html}
                     </tbody>
                 </table>
-                <p>{orders_json}</p>
             </section>
             """
         )
@@ -1291,6 +1290,7 @@ async def poynt_orders(request: Request):
                     }});
                 }}                
             </script>
+            <p>{orders_json}</p>
 
         </body>
         </html>
