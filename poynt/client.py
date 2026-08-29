@@ -1,5 +1,6 @@
 import os
-from datetime import datetime, timedelta, timezone, time, ZoneInfo
+from datetime import datetime, timedelta, timezone, time
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -270,10 +271,6 @@ class PoyntClient:
         start_at = local_midnight.astimezone(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )        
-
-        start_at = local_midnight.astimezone(timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
 
         logger.info(
             "Poynt recent orders request starting: "
