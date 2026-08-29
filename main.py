@@ -840,8 +840,8 @@ async def poynt_orders(request: Request):
                 str(item.get("sku") or "")
             )
 
-            clientNotes = escape(
-                str(item.get("clientNotes") or "")
+            order_notes = escape(
+                str(item.get("notes") or "")
             )
 
             status = escape(
@@ -854,6 +854,7 @@ async def poynt_orders(request: Request):
                     <td class="product_name">{name}</td>
                     <td class="product_qty">{quantity}</td>
                     <td class="product_sku">{sku}</td>
+                    <td class="order_notes">{order_notes}</td>
                   </tr>
                 """
             )
@@ -1024,6 +1025,13 @@ async def poynt_orders(request: Request):
                     white-space: nowrap;                   
                
                 }}
+                .order_notes {{ 
+                    width: 300px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;                   
+               
+                }}                
 
                 .chart-container {{
                     width: 100%;
