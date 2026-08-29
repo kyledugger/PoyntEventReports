@@ -516,6 +516,22 @@ async def poynt_orders(request: Request):
         reverse=True,
     )
 
+    category_map = {
+        "ENE": "Drinks",
+        "N": "Drinks",
+        "REF": "Drinks",
+        "RF": "Drinks",
+        "BAR": "Ice Cream Bars",
+        "BR": "Ice Cream Bars",
+        "BAN": "Frozen Bananas",
+        "BN": "Frozen Bananas",
+        "SHAVE": "Shave Ice",
+        "SHV": "Shave Ice",
+        "COF": "Coffee",
+        "CF": "Coffee",
+        "WTR": "Water"
+    }  
+
     # Count units ordered by SKU across the displayed orders.
     sku_counts = {}
 
@@ -568,6 +584,46 @@ async def poynt_orders(request: Request):
             </tr>
             """
         )
+
+    category_counts = {}
+
+    for prefix, quantity in prefix_counts.items():
+        category = category_map.get(prefix, prefix)
+
+        category_counts[category] = (
+            category_counts.get(category, 0) + quantity
+        )
+
+    category_rows = []
+
+    for category, quantity in sorted(
+        category_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        category_rows.append(
+            f"""
+            <tr>
+                <td>{escape(str(category))}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )
+
+    if category_rows:
+        category_html = "\n".join(category_rows)
+    else:
+        category_html = """
+            <tr>
+                <td colspan="2">
+                    No category data available.
+                </td>
+            </tr>
+        """
 
     if prefix_rows:
         prefix_html = "\n".join(prefix_rows)
@@ -848,7 +904,7 @@ async def poynt_orders(request: Request):
 
                 .report h2 {{
                     margin-bottom: 10px;
-                }}                               
+                }}                                           
             </style>
         </head>
 
@@ -885,11 +941,11 @@ async def poynt_orders(request: Request):
                         </thead>
 
                         <tbody>
-                            {prefix_html}
+                            {category_html}
                         </tbody>
                     </table>
                 </div>
-            </div>          
+            </div>        
 
             <p class="summary">
                 Showing the most recent
