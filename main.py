@@ -444,6 +444,40 @@ async def poynt_catalog(request: Request):
         """
     )
 
+def  get_prefix_counts(orders, sku_counts)   # Count units ordered by SKU prefix/category.
+    prefix_counts = {}
+
+    for order in orders:
+        items = order.get("items") or []
+
+        for item in items:
+            sku = item.get("sku")
+
+            if not sku:
+                continue
+
+            quantity = item.get("quantity", 0)
+
+            try:
+                quantity = float(quantity)
+            except (TypeError, ValueError):
+                quantity = 0
+
+            # SKU count
+            sku_counts[sku] = (
+                sku_counts.get(sku, 0) + quantity
+            )
+
+            # Prefix/category count
+            if "-" in sku:
+                prefix = sku.split("-", 1)[0]
+                prefix_counts[prefix] = (
+                    prefix_counts.get(prefix, 0) + quantity
+                )  
+
+    return prefix_counts            
+
+
 def get_order_intervals(orders):
     # Build chronological order interval data for Chart #1.
     # Each point represents the number of seconds since the
@@ -480,6 +514,62 @@ def get_order_intervals(orders):
         previous_time = current_time
 
         return order_intervals
+    
+
+def get_prefix_rows(prefix_counts):
+    prefix_rows = []
+
+    for prefix, quantity in sorted(
+        prefix_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        prefix_rows.append(
+            f"""
+            <tr>
+                <td>{escape(str(prefix))}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )    
+    return prefix_rows    
+
+def get_category_rows(category_map, prefix_counts):
+    category_counts = {}
+
+    for prefix, quantity in prefix_counts.items():
+        category = category_map.get(prefix, prefix)
+
+        category_counts[category] = (
+            category_counts.get(category, 0) + quantity
+        )
+
+    category_rows = []
+
+    for category, quantity in sorted(
+        category_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        category_rows.append(
+            f"""
+            <tr>
+                <td>{escape(str(category))}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )
+        
+    return category_rows
+
 
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(request: Request):
@@ -631,89 +721,16 @@ async def poynt_orders(request: Request):
         "WTR": "Water"
     }  
 
+    orders_json = json.dumps(orders)
+
     # Count units ordered by SKU across the displayed orders.
     sku_counts = {}
 
-    # Count units ordered by SKU prefix/category.
-    prefix_counts = {}
+    prefix_counts = get_prefix_counts(orders, sku_counts)
 
-    orders_json = json.dumps(orders)
+    prefix_rows = get_prefix_rows(prefix_counts)
 
-    for order in orders:
-        items = order.get("items") or []
-
-        for item in items:
-            sku = item.get("sku")
-
-            if not sku:
-                continue
-
-            quantity = item.get("quantity", 0)
-
-            try:
-                quantity = float(quantity)
-            except (TypeError, ValueError):
-                quantity = 0
-
-            # SKU count
-            sku_counts[sku] = (
-                sku_counts.get(sku, 0) + quantity
-            )
-
-            # Prefix/category count
-            if "-" in sku:
-                prefix = sku.split("-", 1)[0]
-                prefix_counts[prefix] = (
-                    prefix_counts.get(prefix, 0) + quantity
-                )  
-    prefix_rows = []
-
-    for prefix, quantity in sorted(
-        prefix_counts.items(),
-        key=lambda x: (-x[1], x[0])
-    ):
-        if quantity.is_integer():
-            quantity_display = str(int(quantity))
-        else:
-            quantity_display = str(quantity)
-
-        prefix_rows.append(
-            f"""
-            <tr>
-                <td>{escape(str(prefix))}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )
-
-    category_counts = {}
-
-    for prefix, quantity in prefix_counts.items():
-        category = category_map.get(prefix, prefix)
-
-        category_counts[category] = (
-            category_counts.get(category, 0) + quantity
-        )
-
-    category_rows = []
-
-    for category, quantity in sorted(
-        category_counts.items(),
-        key=lambda x: (-x[1], x[0])
-    ):
-        if quantity.is_integer():
-            quantity_display = str(int(quantity))
-        else:
-            quantity_display = str(quantity)
-
-        category_rows.append(
-            f"""
-            <tr>
-                <td>{escape(str(category))}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )
+    category_rows = get_category_rows(category_map, prefix_counts)
 
     if category_rows:
         category_html = "\n".join(category_rows)
@@ -1304,6 +1321,7 @@ async def poynt_orders(request: Request):
         </html>
         """
     )
+
 
 @app.get("/debug/poynt-jwt")
 async def debug_poynt_jwt():
