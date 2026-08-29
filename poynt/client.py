@@ -247,7 +247,7 @@ class PoyntClient:
             tzinfo=now.tzinfo,
         )
 
-        start_at = int(midnight.timestamp())        
+        start_at = midnight.strftime("%Y-%m-%dT%H:%M:%SZ")    
 
         logger.info(
             "Poynt recent orders request starting: "
