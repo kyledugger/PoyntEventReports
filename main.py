@@ -4,7 +4,7 @@ import os
 import secrets
 from urllib.parse import urlencode
 from html import escape
-
+import json
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
@@ -444,6 +444,43 @@ async def poynt_catalog(request: Request):
         """
     )
 
+def get_order_intervals(orders):
+    # Build chronological order interval data for Chart #1.
+    # Each point represents the number of seconds since the
+    # previous order. The timestamp belongs to the newer order.
+    chronological_orders = list(reversed(orders))
+
+    order_intervals = []
+
+    previous_time = None
+
+    for order in chronological_orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            current_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            continue
+
+        if previous_time is not None:
+            interval_seconds = (
+                current_time - previous_time
+            ).total_seconds()
+
+            order_intervals.append({
+                "time": created_at,
+                "seconds": interval_seconds,
+            })
+
+        previous_time = current_time
+
+        return order_intervals
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(request: Request):
     user_id = request.session.get("user_id")
@@ -537,6 +574,9 @@ async def poynt_orders(request: Request):
         except (TypeError, ValueError):
             continue
 
+    order_intervals = get_order_intervals(orders)
+    chart_data_json = json.dumps(order_intervals)
+
     if order_times:
         oldest_order_at = min(order_times)
         newest_order_at = max(order_times)
@@ -596,6 +636,8 @@ async def poynt_orders(request: Request):
 
     # Count units ordered by SKU prefix/category.
     prefix_counts = {}
+
+    orders_json = json.dumps(orders)
 
     for order in orders:
         items = order.get("items") or []
@@ -865,10 +907,11 @@ async def poynt_orders(request: Request):
                         {items_html}
                     </tbody>
                 </table>
+                <p>{orders_json}</p>
             </section>
             """
         )
-    logger.info(orders)
+
     if order_sections:
         orders_html = "\n".join(order_sections)
     else:
@@ -881,6 +924,8 @@ async def poynt_orders(request: Request):
         <!DOCTYPE html>
         <html>
         <head>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>        
             <title>Recent Poynt Orders</title>
 
             <style>
@@ -980,6 +1025,20 @@ async def poynt_orders(request: Request):
                     white-space: nowrap;                   
                
                 }}
+
+                .chart-container {{
+                    width: 100%;
+                    margin-bottom: 30px;
+                }}
+
+                .chart-container h2 {{
+                    margin-bottom: 10px;
+                }}
+
+                #orderIntervalChart {{
+                    width: 100%;
+                    height: 300px;
+                }}
                
             </style>
         </head>
@@ -1013,13 +1072,19 @@ async def poynt_orders(request: Request):
                 <strong>{order_span_display} minutes</strong>
     |
                 <strong>{average_seconds_display} sec/order</strong>                
-                
+
             </p>            
 
             <p>
                 Loaded:
                 <time id="page-loaded-time"></time>
             </p>
+
+            <div class="chart-container">
+                <h2>Time Between Orders</h2>
+
+                <canvas id="orderIntervalChart"></canvas>
+            </div>
 
             <div class="reports">
                 <div class="report">
@@ -1132,6 +1197,99 @@ async def poynt_orders(request: Request):
                             " | "
                         );
                 }}
+                const orderIntervalData = {chart_data_json};
+
+                const orderIntervalCanvas =
+                    document.getElementById("orderIntervalChart");
+
+                if (orderIntervalCanvas && orderIntervalData.length > 0) {{
+                    new Chart(orderIntervalCanvas, {{
+                        type: "line",
+
+                        data: {{
+                            datasets: [{{
+                                label: "Seconds Between Orders",
+
+                                data: orderIntervalData.map(function(point) {{
+                                    return {{
+                                        x: new Date(point.time),
+                                        y: point.seconds
+                                    }};
+                                }}),
+
+                                tension: 0.15,
+                                pointRadius: 2,
+                                pointHoverRadius: 5,
+                                borderWidth: 2,
+                                fill: false
+                            }}]
+                        }},
+
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            interaction: {{
+                                mode: "nearest",
+                                intersect: false
+                            }},
+
+                            plugins: {{
+                                legend: {{
+                                    display: false
+                                }},
+
+                                tooltip: {{
+                                    callbacks: {{
+                                        title: function(context) {{
+                                            return new Intl.DateTimeFormat(
+                                                undefined,
+                                                {{
+                                                    weekday: "short",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                    second: "2-digit",
+                                                    hour12: true
+                                                }}
+                                            ).format(context[0].parsed.x);
+                                        }},
+
+                                        label: function(context) {{
+                                            return context.parsed.y.toFixed(1)
+                                                + " seconds since previous order";
+                                        }}
+                                    }}
+                                }}
+                            }},
+
+                            scales: {{
+                                x: {{
+                                    type: "time",
+
+                                    time: {{
+                                        tooltipFormat: "MMM d, h:mm:ss a"
+                                    }},
+
+                                    title: {{
+                                        display: true,
+                                        text: "Order Time"
+                                    }}
+                                }},
+
+                                y: {{
+                                    beginAtZero: true,
+
+                                    title: {{
+                                        display: true,
+                                        text: "Seconds"
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }});
+                }}                
             </script>
 
         </body>
