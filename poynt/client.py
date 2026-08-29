@@ -261,6 +261,8 @@ class PoyntClient:
         )
 
         local_now = datetime.now(ZoneInfo("America/Phoenix"))
+        days_to_subtract = 1
+        local_now = local_now - timedelta(days=days_to_subtract)
 
         local_midnight = datetime.combine(
             local_now.date(),
