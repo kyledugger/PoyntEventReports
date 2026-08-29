@@ -232,8 +232,7 @@ class PoyntClient:
 
         return response.json()
     
-
-    async def get_recent_orders(self, limit: int = 50) -> list[dict]:
+    async def get_recent_orders(self, limit=100, start_at=None) -> list[dict]:    
         """
         Get the most recent orders for this business.
 
@@ -306,6 +305,9 @@ class PoyntClient:
                 "limit": limit,
                 "startOffset": start_offset,
             }
+
+            if start_at:
+                params["startAt"] = start_at            
 
             response = await client.get(
                 url,

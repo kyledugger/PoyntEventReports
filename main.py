@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo
 from poynt.token import exchange_authorization_code
 
 import os
@@ -679,7 +680,10 @@ def get_category_rows(category_map, prefix_counts):
 
 
 @app.get("/poynt/orders", response_class=HTMLResponse)
-async def poynt_orders(request: Request):
+async def poynt_orders(
+    request: Request,
+    today: bool = False,
+):
     user_id = request.session.get("user_id")
 
     if not user_id:
@@ -687,6 +691,31 @@ async def poynt_orders(request: Request):
             "/login",
             status_code=303
         )
+
+    start_at = None 
+
+    if today:
+        arizona_tz = ZoneInfo("America/Phoenix")
+
+        now = datetime.now(arizona_tz)
+
+        start_of_day = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+
+        start_at = start_of_day.isoformat()
+
+        logger.info(
+            "Orders filter: TODAY, start_at=%s",
+            start_at,
+        )
+    else:
+        logger.info(
+            "Orders filter: MOST RECENT 100"
+        )    
 
     credentials = get_poynt_credentials(user_id)
 
@@ -708,7 +737,13 @@ async def poynt_orders(request: Request):
             user_id=user_id,
         )
 
-        orders = await client.get_recent_orders(100)
+        if today:
+            orders = await client.get_recent_orders(
+                100,
+                start_at=start_at,
+            )
+        else:
+            orders = await client.get_recent_orders(100)
 
     except PoyntReauthorizationRequired:
         return HTMLResponse(
@@ -743,6 +778,17 @@ async def poynt_orders(request: Request):
             status_code=502
         )
 
+    checked_attribute = "checked" if today else ""
+
+    if today:
+        summary_text = (
+            f"Showing {len(orders)} orders from today."
+        )
+    else:
+        summary_text = (
+            f"Showing the most recent {len(orders)} orders."
+        )
+
     # Newest first.
     orders = sorted(
         orders,
@@ -754,6 +800,7 @@ async def poynt_orders(request: Request):
     oldest_order_at = None
     newest_order_at = None
     order_span_minutes = None
+    average_seconds_display = "N/A"    
 
     order_times = []
 
@@ -1177,11 +1224,23 @@ async def poynt_orders(request: Request):
         <body>
 
             <h1>Recent Poynt Orders</h1>
+            <form method="get" action="/poynt/orders">
+                <label>
+                    <input
+                        type="checkbox"
+                        name="today"
+                        value="true"
+                        {checked_attribute}
+                    >
+                    Orders only from today
+                </label>
 
+                <button type="submit">
+                    Generate
+                </button>
+            </form>
             <p class="summary">
-                Showing the most recent
-                {len(orders)}
-                orders.
+                {summary_text}
             </p>
 
             <p>
@@ -1447,7 +1506,7 @@ async def poynt_orders(request: Request):
                         data: {{
                             datasets: [{{
                                 label: "Items Ordered",
-                                
+
                                 data: itemFlowData.map(function(point) {{
                                     return {{
                                         x: new Date(point.time),
