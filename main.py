@@ -793,11 +793,9 @@ async def poynt_orders(request: Request):
             item_rows.append(
                 f"""
                 <tr>
-                    <td>{name}</td>
-                    <td>{quantity}</td>
-                    <td>{details}</td>
-                    <td>{sku}</td>
-                    <td>{clientNotes}</td>
+                    <td class="product_name">{name}</td>
+                    <td class="product_qty">{quantity}</td>
+                    <td class="product_sku">{sku}</td>
                   </tr>
                 """
             )
@@ -807,7 +805,7 @@ async def poynt_orders(request: Request):
         else:
             items_html = """
                 <tr>
-                    <td colspan="5">
+                    <td colspan="3">
                         No order items.
                     </td>
                 </tr>
@@ -841,11 +839,9 @@ async def poynt_orders(request: Request):
                 <table>
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Qty</th>
-                            <th>Details</th>
-                            <th>SKU</th>
-                            <th>Notes</th>
+                            <th class="product_name">Name</th>
+                            <th class="product_qty">Qty</th>
+                            <th class="product_sku">SKU</th>
                         </tr>
                     </thead>
 
@@ -947,7 +943,28 @@ async def poynt_orders(request: Request):
 
                 .report h2 {{
                     margin-bottom: 10px;
-                }}                                           
+                }}  
+
+                .product_name {{ 
+                    width: 200px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;                
+                }}
+                .product_qty {{ 
+                    width: 50px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;                   
+                }}
+                .product_sku {{ 
+                    width: 10px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;                   
+               
+                }}
+               
             </style>
         </head>
 
