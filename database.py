@@ -9,9 +9,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
-load_dotenv(dotenv_file, ".env")
+load_dotenv(dotenv_file)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured")
+
 _db_url = urlparse(DATABASE_URL)
 
 logger.info(
@@ -19,9 +23,6 @@ logger.info(
     _db_url.hostname,
     _db_url.path.lstrip("/"),
 )
-
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not configured")
 
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(

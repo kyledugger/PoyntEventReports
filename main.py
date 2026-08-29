@@ -29,7 +29,7 @@ from poynt.client import (
 )
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
-load_dotenv(dotenv_file, ".env")
+load_dotenv(dotenv_file)
 
 from logging_config import configure_logging
 
