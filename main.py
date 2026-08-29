@@ -946,7 +946,7 @@ async def poynt_orders(request: Request):
                 }}  
 
                 .product_name {{ 
-                    width: 200px;
+                    width: 300px;
                     overflow: hidden;
                     display: inline-block;
                     white-space: nowrap;                
@@ -958,7 +958,7 @@ async def poynt_orders(request: Request):
                     white-space: nowrap;                   
                 }}
                 .product_sku {{ 
-                    width: 100px;
+                    width: 200px;
                     overflow: hidden;
                     display: inline-block;
                     white-space: nowrap;                   
