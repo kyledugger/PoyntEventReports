@@ -27,7 +27,8 @@ from poynt.client import (
     PoyntReauthorizationRequired,
 )
 
-load_dotenv()
+dotenv_file = os.getenv("DOTENV_FILE", ".env")
+load_dotenv(dotenv_file, ".env")
 
 from logging_config import configure_logging
 
@@ -35,6 +36,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 configure_logging()
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+
+if ENVIRONMENT == "local-prod-db":
+    logger.warning("============================================================")
+    logger.warning("LOCAL APPLICATION")
+    logger.warning("DATABASE: PRODUCTION")
+    logger.warning("============================================================")
+elif ENVIRONMENT == "production":
+    logger.info("============================================================")
+    logger.info("PRODUCTION APPLICATION")
+    logger.info("DATABASE: PRODUCTION")
+    logger.info("============================================================")
+else:
+    logger.info("============================================================")
+    logger.info("LOCAL APPLICATION")
+    logger.info("DATABASE: LOCAL")
+    logger.info("============================================================")
 
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
@@ -137,8 +156,9 @@ async def login(
     email: str = Form(...),
     password: str = Form(...)
 ):
-
     email = email.strip().lower()
+
+    logger.debug("LOGIN: submitted email=%r", email)
 
     with SessionLocal() as session:
 
@@ -146,10 +166,30 @@ async def login(
             select(User).where(User.email == email)
         ).scalar_one_or_none()
 
-        if not user or not verify_password(
-            password,
-            user.password_hash
-        ):
+        logger.debug(
+            "LOGIN: user found=%s, user_id=%s",
+            user is not None,
+            user.id if user else None,
+        )
+
+        logger.debug(
+            "Login user lookup: found=%s, user_id=%s",
+            user is not None,
+            user.id if user else None,
+        )
+
+        password_valid = (
+            verify_password(password, user.password_hash)
+            if user
+            else False
+        )
+
+        logger.debug(
+            "LOGIN: password valid=%s",
+            password_valid,
+        )
+
+        if not user or not password_valid:
 
             return templates.TemplateResponse(
                 request=request,
@@ -444,7 +484,7 @@ async def poynt_catalog(request: Request):
         """
     )
 
-def  get_prefix_counts(orders, sku_counts)   # Count units ordered by SKU prefix/category.
+def  get_prefix_counts(orders, sku_counts):   # Count units ordered by SKU prefix/category.
     prefix_counts = {}
 
     for order in orders:
@@ -513,8 +553,55 @@ def get_order_intervals(orders):
 
         previous_time = current_time
 
-        return order_intervals
+    return order_intervals
     
+
+def get_item_flow(orders):
+    # Count total item quantity in one-minute buckets.
+    # Each bucket is keyed by the local-independent UTC minute
+    # represented by the order timestamp.
+
+    chronological_orders = list(reversed(orders))
+
+    item_flow = {}
+
+    for order in chronological_orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            order_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            continue
+
+        # Normalize to the beginning of the minute.
+        minute = order_time.replace(second=0, microsecond=0)
+
+        total_items = 0
+
+        for item in order.get("items") or []:
+            quantity = item.get("quantity", 0)
+
+            try:
+                total_items += float(quantity)
+            except (TypeError, ValueError):
+                continue
+
+        item_flow[minute] = (
+            item_flow.get(minute, 0) + total_items
+        )
+
+    return [
+        {
+            "time": minute.isoformat(),
+            "items": quantity,
+        }
+        for minute, quantity in sorted(item_flow.items())
+    ]    
 
 def get_prefix_rows(prefix_counts):
     prefix_rows = []
@@ -666,6 +753,9 @@ async def poynt_orders(request: Request):
 
     order_intervals = get_order_intervals(orders)
     chart_data_json = json.dumps(order_intervals)
+
+    item_flow = get_item_flow(orders)
+    item_flow_json = json.dumps(item_flow)    
 
     if order_times:
         oldest_order_at = min(order_times)
@@ -1051,17 +1141,14 @@ async def poynt_orders(request: Request):
                 }}                
 
                 .chart-container {{
+                    position: relative;
                     width: 100%;
+                    height: 350px;
                     margin-bottom: 30px;
                 }}
 
                 .chart-container h2 {{
                     margin-bottom: 10px;
-                }}
-
-                #orderIntervalChart {{
-                    width: 100%;
-                    height: 300px;
                 }}
                
             </style>
@@ -1109,7 +1196,11 @@ async def poynt_orders(request: Request):
 
                 <canvas id="orderIntervalChart"></canvas>
             </div>
-
+            <div class="chart-container">
+                <h2>Item Order Flow Rate</h2>
+                <canvas id="itemFlowChart"></canvas>
+            </div>vas id="orderIntervalChart"></canvas>
+            </div>
             <div class="reports">
                 <div class="report">
                     <h2>Items Ordered</h2>
@@ -1313,10 +1404,89 @@ async def poynt_orders(request: Request):
                             }}
                         }}
                     }});
-                }}                
-            </script>
-            <p>{orders_json}</p>
+                }}    
 
+                const itemFlowData = {item_flow_json};
+
+                const itemFlowCanvas =
+                    document.getElementById("itemFlowChart");
+
+                if (itemFlowCanvas && itemFlowData.length > 0) {{
+                    new Chart(itemFlowCanvas, {{
+                        type: "bar",
+
+                        data: {{
+                            datasets: [{{
+                                label: "Items Ordered",
+                                data: itemFlowData.map(function(point) {{
+                                    return {{
+                                        x: new Date(point.time),
+                                        y: point.items
+                                    }};
+                                }})
+                            }}]
+                        }},
+
+                        options: {{
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            plugins: {{
+                                legend: {{
+                                    display: false
+                                }},
+
+                                tooltip: {{
+                                    callbacks: {{
+                                        title: function(context) {{
+                                            return new Intl.DateTimeFormat(
+                                                undefined,
+                                                {{
+                                                    weekday: "short",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                    hour12: true
+                                                }}
+                                            ).format(context[0].parsed.x);
+                                        }},
+
+                                        label: function(context) {{
+                                            return context.parsed.y
+                                                + " items ordered";
+                                        }}
+                                    }}
+                                }}
+                            }},
+
+                            scales: {{
+                                x: {{
+                                    type: "time",
+
+                                    time: {{
+                                        tooltipFormat: "MMM d, h:mm a"
+                                    }},
+
+                                    title: {{
+                                        display: true,
+                                        text: "Order Time"
+                                    }}
+                                }},
+
+                                y: {{
+                                    beginAtZero: true,
+
+                                    title: {{
+                                        display: true,
+                                        text: "Items per Minute"
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }});
+                }}                            
+            </script>
         </body>
         </html>
         """
