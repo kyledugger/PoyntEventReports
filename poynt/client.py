@@ -232,7 +232,111 @@ class PoyntClient:
 
         return response.json()
     
+
     async def get_recent_orders(self, limit: int = 50) -> list[dict]:
+        """
+        Get the most recent orders for this business.
+
+        Poynt's orders endpoint returns collections in ascending
+        pagination order. We first retrieve the total order count,
+        then request the final page using startOffset.
+        """
+
+        await self._refresh_if_needed()
+
+        limit = max(1, min(limit, 100))
+
+        url = (
+            f"{self.BASE_URL}"
+            f"/businesses/{self.business_id}/orders"
+        )
+
+        # First request: determine the total number of orders.
+        logger.info(
+            "Poynt recent orders count request starting."
+        )
+
+        count_params = {
+            "limit": 1,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            count_response = await client.get(
+                url,
+                headers=self._headers(),
+                params=count_params,
+            )
+
+            if not count_response.is_success:
+                logger.error(
+                    "Poynt recent orders count request failed: "
+                    "HTTP %d",
+                    count_response.status_code,
+                )
+
+                raise PoyntAPIError(
+                    f"Poynt API returned HTTP "
+                    f"{count_response.status_code}"
+                )
+
+            count_data = count_response.json()
+            total_count = int(count_data.get("count", 0))
+
+            logger.info(
+                "Poynt recent orders count received: "
+                "total_orders=%d.",
+                total_count,
+            )
+
+            if total_count == 0:
+                return []
+
+            # If fewer than `limit` orders exist, start at zero.
+            start_offset = max(0, total_count - limit)
+
+            logger.info(
+                "Poynt recent orders request starting: "
+                "limit=%d, start_offset=%d, total_orders=%d.",
+                limit,
+                start_offset,
+                total_count,
+            )
+
+            params = {
+                "limit": limit,
+                "startOffset": start_offset,
+            }
+
+            response = await client.get(
+                url,
+                headers=self._headers(),
+                params=params,
+            )
+
+        if not response.is_success:
+            logger.error(
+                "Poynt recent orders request failed: HTTP %d",
+                response.status_code,
+            )
+
+            raise PoyntAPIError(
+                f"Poynt API returned HTTP "
+                f"{response.status_code}"
+            )
+
+        data = response.json()
+        orders = data.get("orders", [])
+
+        logger.info(
+            "Poynt recent orders request succeeded: "
+            "HTTP %d, orders_received=%d.",
+            response.status_code,
+            len(orders),
+        )
+
+        return orders
+    
+    async def get_recent_orders_orig(self, limit: int = 50) -> list[dict]:
         """
         Get the most recent orders for this business.
         """
