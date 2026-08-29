@@ -541,9 +541,25 @@ async def poynt_orders(request: Request):
         oldest_order_at = min(order_times)
         newest_order_at = max(order_times)
 
-        order_span_minutes = (
+        order_span_seconds = (
             newest_order_at - oldest_order_at
-        ).total_seconds() / 60
+        ).total_seconds() 
+
+        order_span_minutes = order_span_seconds / 60
+
+        if len(order_times) > 1:
+            average_seconds_between_orders = (
+                order_span_seconds / (len(order_times) - 1)
+            )
+        else:
+            average_seconds_between_orders = None        
+
+        if average_seconds_between_orders is not None:
+            average_seconds_display = (
+                f"{average_seconds_between_orders:.1f}"
+            )
+        else:
+            average_seconds_display = "N/A"
 
     if oldest_order_at and newest_order_at:
         oldest_order_iso = oldest_order_at.isoformat()
@@ -995,6 +1011,9 @@ async def poynt_orders(request: Request):
                 </strong>
                 |
                 <strong>{order_span_display} minutes</strong>
+    |
+                <strong>{average_seconds_display} sec/order</strong>                
+                
             </p>            
 
             <p>
