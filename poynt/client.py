@@ -259,6 +259,9 @@ class PoyntClient:
             "limit": 1,
         }
 
+        if start_at:
+            count_params["startAt"] = start_at
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             count_response = await client.get(
                 url,

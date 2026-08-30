@@ -623,6 +623,75 @@ def get_item_flow(orders):
 
     return result
 
+def get_revenue_flow(orders):
+    chronological_orders = list(reversed(orders))
+
+    revenue_flow = {}
+    first_bucket = None
+    last_bucket = None
+
+    for order in chronological_orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            order_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            continue
+
+        bucket_minute = (order_time.minute // 5) * 5
+
+        bucket_time = order_time.replace(
+            minute=bucket_minute,
+            second=0,
+            microsecond=0
+        )
+
+        if first_bucket is None:
+            first_bucket = bucket_time
+
+        last_bucket = bucket_time
+
+        amounts = order.get("amounts") or {}
+
+        total = amounts.get("netTotal")
+
+        if total is None:
+            total = amounts.get("orderAmount")
+
+        try:
+            revenue = float(total) / 100
+        except (TypeError, ValueError):
+            revenue = 0
+
+        revenue_flow[bucket_time] = (
+            revenue_flow.get(bucket_time, 0) + revenue
+        )
+
+    if first_bucket is None:
+        return []
+
+    # Fill every five-minute bucket, including zero-activity buckets.
+    result = []
+
+    bucket_time = first_bucket
+
+    while bucket_time <= last_bucket:
+        result.append({
+            "time": bucket_time.isoformat(),
+            "revenue": round(
+                revenue_flow.get(bucket_time, 0),
+                2
+            ),
+        })
+
+        bucket_time += timedelta(minutes=5)
+
+    return result
 
 def get_prefix_rows(prefix_counts):
     prefix_rows = []
@@ -705,6 +774,8 @@ async def poynt_orders(
             second=0,
             microsecond=0,
         )
+
+        start_of_day = start_of_day - timedelta(days=1)        
 
         start_at = start_of_day.isoformat()
 
@@ -823,6 +894,9 @@ async def poynt_orders(
 
     item_flow = get_item_flow(orders)
     item_flow_json = json.dumps(item_flow)    
+
+    revenue_flow = get_revenue_flow(orders)
+    revenue_flow_json = json.dumps(revenue_flow)    
 
     if order_times:
         oldest_order_at = min(order_times)
@@ -1277,8 +1351,12 @@ async def poynt_orders(
             </div>
             <div class="chart-container">
                 <h2>Item Order Flow Rate</h2>
+            
                 <canvas id="itemFlowChart"></canvas>
-            </div>vas id="orderIntervalChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h2>Revenue Flow Rate</h2>
+                <canvas id="revenueFlowChart"></canvas>
             </div>
             <div class="reports">
                 <div class="report">
@@ -1452,7 +1530,7 @@ async def poynt_orders(
                                         }},
 
                                         label: function(context) {{
-                                            return context.parsed.y + " items ordered";
+                                            return context.parsed.y + " seconds between orders";
                                         }}
                                     }}
                                 }}                            
@@ -1576,7 +1654,97 @@ async def poynt_orders(
                             }}
                         }}
                     }});
-                }}                            
+                }}
+
+                const revenueFlowData = {revenue_flow_json};
+
+                const revenueFlowCanvas =
+                    document.getElementById("revenueFlowChart");
+
+                if (revenueFlowCanvas && revenueFlowData.length > 0) {{
+                    new Chart(revenueFlowCanvas,{{
+                        type: "bar",
+
+                        data:{{
+                            datasets: [{{
+                                label: "Revenue",
+                                data: revenueFlowData.map(function(point){{
+                                    return{{
+                                        x: new Date(point.time),
+                                        y: point.revenue
+                                    }};
+                                }}),
+
+                                barThickness: "flex"
+                            }}]
+                        }},
+
+                        options:{{
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            plugins:{{
+                                legend:{{
+                                    display: false
+                                }},
+
+                                tooltip:{{
+                                    callbacks:{{
+                                        title: function(context){{
+                                            return new Intl.DateTimeFormat(
+                                                undefined,
+                                               {{
+                                                    weekday: "short",
+                                                    month: "short",
+                                                    day: "numeric",
+                                                    hour: "numeric",
+                                                    minute: "2-digit",
+                                                    hour12: true
+                                                }}
+                                            ).format(context[0].parsed.x);
+                                        }},
+
+                                        label: function(context){{
+                                            return "$"
+                                                + context.parsed.y.toFixed(2)
+                                                + " revenue";
+                                        }}
+                                    }}
+                                }}
+                            }},
+
+                            scales:{{
+                                x:{{
+                                    type: "time",
+
+                                    time:{{
+                                        tooltipFormat: "MMM d, h:mm a"
+                                    }},
+
+                                    title:{{
+                                        display: true,
+                                        text: "Order Time"
+                                    }}
+                                }},
+
+                                y:{{
+                                    beginAtZero: true,
+
+                                    title:{{
+                                        display: true,
+                                        text: "Dollars per 5 Minutes"
+                                    }},
+
+                                    ticks:{{
+                                        callback: function(value){{
+                                            return "$" + value;
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }});
+                }}                                            
             </script>
         </body>
         </html>
