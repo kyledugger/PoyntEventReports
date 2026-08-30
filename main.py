@@ -747,11 +747,28 @@ def get_category_rows(category_map, prefix_counts):
         
     return category_rows
 
+def validate_and_convert_iso_datetime(iso_string: str):
+    if iso_string == "":
+        return None
+
+    try:
+        return datetime.fromisoformat(iso_string)
+
+    except ValueError:
+        logger.warning(
+            "date/time parameter %s was not a valid ISO datetime string",
+            iso_string
+        )
+        return None
+
+
+
 
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
-    today: bool = False,
+    start: str = "",
+    end: str = "",
 ):
     user_id = request.session.get("user_id")
 
@@ -760,10 +777,48 @@ async def poynt_orders(
             "/login",
             status_code=303
         )
+    
+    start_input_value = start
+    end_input_value = end    
 
-    start_at = None 
+    start_at_date = validate_and_convert_iso_datetime(start)
+    end_at_date = validate_and_convert_iso_datetime(end)
 
-    if today:
+    arizona_tz = ZoneInfo("America/Phoenix")
+
+    if start_at_date and start_at_date.tzinfo is None:
+        start_at_date = start_at_date.replace(tzinfo=arizona_tz)
+
+    if end_at_date and end_at_date.tzinfo is None:
+        end_at_date = end_at_date.replace(tzinfo=arizona_tz)    
+
+    # Valid parameter inputs
+    # no params:
+    #  Description: live mode
+    #   start = will be generated to be end of the start day
+    #  orders will include orders from start of today to present
+    # start only
+    #   end = will be generated to be end of the start day
+    # start & end
+    #   orders will include orders between start and end times
+    
+    live = False
+
+    if start_at_date and not end_at_date:
+        return HTMLResponse(
+            """
+            <h1>End Date Error</h1>
+            <p>enddate parameter was provided but is not valid</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=404
+        )
+    
+    if not start_at_date: 
+        live = True
+
         arizona_tz = ZoneInfo("America/Phoenix")
 
         now = datetime.now(arizona_tz)
@@ -775,18 +830,35 @@ async def poynt_orders(
             microsecond=0,
         )
 
-        start_of_day = start_of_day - timedelta(days=1)        
-
         start_at = start_of_day.isoformat()
 
         logger.info(
-            "Orders filter: TODAY, start_at=%s",
+            "Generating start_at time to be beginning of the day: %s",
             start_at,
         )
     else:
-        logger.info(
-            "Orders filter: MOST RECENT 100"
-        )    
+        start_at = start_at_date.isoformat()
+
+
+    if not end_at_date:
+        # set day to end of day today
+        arizona_tz = ZoneInfo("America/Phoenix")
+
+        now = datetime.now(arizona_tz)
+
+        end_of_day = now.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+
+        end_of_day = end_of_day + timedelta(days=1)        
+
+        end_at = end_of_day.isoformat()
+    else:    
+        end_at = end_at_date.isoformat()
+
 
     credentials = get_poynt_credentials(user_id)
 
@@ -808,13 +880,17 @@ async def poynt_orders(
             user_id=user_id,
         )
 
-        if today:
+        if live:
             orders = await client.get_recent_orders(
                 100,
                 start_at=start_at,
             )
         else:
-            orders = await client.get_recent_orders(100)
+            orders = await client.get_recent_orders(
+                100,
+                start_at=start_at,
+                end_at=end_at,
+            )
 
     except PoyntReauthorizationRequired:
         return HTMLResponse(
@@ -849,9 +925,7 @@ async def poynt_orders(
             status_code=502
         )
 
-    checked_attribute = "checked" if today else ""
-
-    if today:
+    if live:
         summary_text = (
             f"Showing {len(orders)} orders from today."
         )
@@ -1067,6 +1141,15 @@ async def poynt_orders(
         else:
             total_display = "Unknown"
 
+        order_notes = escape(
+                str(order.get("notes") or "")
+            )
+
+        order_notes_HTML = ""    
+
+        if order_notes:
+            order_notes_HTML = f"""<div class="notes-container"><table><tr><td class="notes_header">Notes</td><td class="notes">{order_notes}</td></tr></table></div>"""
+
         items = order.get("items") or []
 
         item_rows = []
@@ -1088,10 +1171,6 @@ async def poynt_orders(
                 str(item.get("sku") or "")
             )
 
-            order_notes = escape(
-                str(item.get("notes") or "")
-            )
-
             status = escape(
                 str(item.get("status") or "")
             )
@@ -1102,7 +1181,6 @@ async def poynt_orders(
                     <td class="product_name">{name}</td>
                     <td class="product_qty">{quantity}</td>
                     <td class="product_sku">{sku}</td>
-                    <td class="order_notes">{order_notes}</td>
                   </tr>
                 """
             )
@@ -1112,7 +1190,7 @@ async def poynt_orders(
         else:
             items_html = """
                 <tr>
-                    <td colspan="3">
+                    <td colspan="4">
                         No order items.
                     </td>
                 </tr>
@@ -1124,16 +1202,13 @@ async def poynt_orders(
                 <div class="order-header">
                     <div>
                         <strong>Order {order_number}</strong>
-                        <span class="status">
-                            {status_display}
-                        </span>
                     </div>
 
                     <div>
                         <time
                             class="local-time"
                             datetime="{created_at}"
-                        >
+                        
                             {created_at}
                         </time>
                     </div>
@@ -1142,11 +1217,12 @@ async def poynt_orders(
                         <strong>{total_display}</strong>
                     </div>
                 </div>
+                {order_notes_HTML}
 
                 <table>
                     <thead>
                         <tr>
-                            <th class="product_name">Name</th>
+                            <th class="product_name">Item Name</th>
                             <th class="product_qty">Qty</th>
                             <th class="product_sku">SKU</th>
                         </tr>
@@ -1174,7 +1250,7 @@ async def poynt_orders(
         <head>
             <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>        
-            <title>Recent Poynt Orders</title>
+            <title>Orders Report</title>
 
             <style>
                 body {{
@@ -1278,7 +1354,6 @@ async def poynt_orders(
                     overflow: hidden;
                     display: inline-block;
                     white-space: nowrap;                   
-               
                 }}                
 
                 .chart-container {{
@@ -1291,6 +1366,61 @@ async def poynt_orders(
                 .chart-container h2 {{
                     margin-bottom: 10px;
                 }}
+
+                .notes-container {{
+                    margin-bottom: 5px;
+                }}
+                .notes_header {{
+                    font-weight: bold;
+                    width: 50px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;
+                    border: 1px solid #ccc;
+                    padding: 7px;
+                    text-align: left;
+                    vertical-align: top;                                         
+                }}
+                .notes {{
+                    width: 600px;
+                    overflow: hidden;
+                    display: inline-block;
+                    white-space: nowrap;   
+                    border: 1px solid #ccc;
+                    padding: 7px;
+                    text-align: left;
+                    vertical-align: top;                                      
+                }}
+
+                .metrics-controls {{
+                    display: flex;
+                    align-items: flex-end;
+                    gap: 15px;
+                    margin-bottom: 15px;
+                    flex-wrap: wrap;
+                }}
+
+                .date-field {{
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                }}
+
+                .date-field label {{
+                    font-weight: bold;
+                }}
+
+                .date-field input {{
+                    font-size: 16px;
+                    padding: 7px;
+                }}
+
+                .metrics-controls button {{
+                    font-size: 16px;
+                    padding: 7px 14px;
+                    cursor: pointer;
+                }}                
+
                
             </style>
         </head>
@@ -1299,19 +1429,39 @@ async def poynt_orders(
 
             <h1>Recent Poynt Orders</h1>
             <form method="get" action="/poynt/orders">
-                <label>
-                    <input
-                        type="checkbox"
-                        name="today"
-                        value="true"
-                        {checked_attribute}
-                    >
-                    Orders only from today
-                </label>
 
-                <button type="submit">
-                    Generate
-                </button>
+                <div class="metrics-controls">
+
+                    <div class="date-field">
+                        <label for="start">Start</label>
+                        <input
+                            type="datetime-local"
+                            id="start"
+                            name="start"
+                            value="{start_input_value}"
+                        >
+                    </div>
+
+                    <div class="date-field">
+                        <label for="end">End</label>
+                        <input
+                            type="datetime-local"
+                            id="end"
+                            name="end"
+                            value="{end_input_value}"
+                        >
+                    </div>
+
+                    <button type="button" onclick="setToday()">
+                        Today
+                    </button>
+
+                    <button type="submit">
+                        Generate
+                    </button>
+
+                </div>
+
             </form>
             <p class="summary">
                 {summary_text}
@@ -1489,7 +1639,7 @@ async def poynt_orders(
                                     }};
                                 }}),
 
-                                tension: 0.15,
+                                tension: 0.0,
                                 pointRadius: 2,
                                 pointHoverRadius: 5,
                                 borderWidth: 2,
@@ -1744,7 +1894,31 @@ async def poynt_orders(
                             }}
                         }}
                     }});
-                }}                                            
+                }} 
+                function setToday() {{
+                    const now = new Date();
+
+                    const start = new Date(now);
+                    start.setHours(0, 0, 0, 0);
+
+                    const end = new Date(now);
+
+                    function formatForDateTimeLocal(date) {{
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, "0");
+                        const day = String(date.getDate()).padStart(2, "0");
+                        const hours = String(date.getHours()).padStart(2, "0");
+                        const minutes = String(date.getMinutes()).padStart(2, "0");
+
+                        return `${{year}}-${{month}}-${{day}}T${{hours}}:${{minutes}}`;
+                    }}
+
+                    document.getElementById("start").value =
+                        formatForDateTimeLocal(start);
+
+                    document.getElementById("end").value =
+                        formatForDateTimeLocal(end);
+                }}                                                           
             </script>
         </body>
         </html>

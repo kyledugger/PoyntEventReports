@@ -232,7 +232,7 @@ class PoyntClient:
 
         return response.json()
     
-    async def get_recent_orders(self, limit=100, start_at=None) -> list[dict]:    
+    async def get_recent_orders(self, limit=100, start_at=None, end_at=None) -> list[dict]:    
         """
         Get the most recent orders for this business.
 
@@ -261,6 +261,9 @@ class PoyntClient:
 
         if start_at:
             count_params["startAt"] = start_at
+
+        if end_at:
+            count_params["endAt"] = end_at
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             count_response = await client.get(
@@ -311,6 +314,8 @@ class PoyntClient:
 
             if start_at:
                 params["startAt"] = start_at            
+            if end_at:
+                params["endAt"] = end_at            
 
             response = await client.get(
                 url,
