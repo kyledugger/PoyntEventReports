@@ -1427,7 +1427,7 @@ async def poynt_orders(
 
         <body>
 
-            <h1>Recent Poynt Orders</h1>
+            <h1>Orders Report</h1>
             <form method="get" action="/poynt/orders">
 
                 <div class="metrics-controls">
@@ -1902,6 +1902,7 @@ async def poynt_orders(
                     start.setHours(0, 0, 0, 0);
 
                     const end = new Date(now);
+                    end.setHours(23, 59, 59, 999);                    
 
                     function formatForDateTimeLocal(date) {{
                         const year = date.getFullYear();
