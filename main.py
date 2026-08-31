@@ -530,12 +530,12 @@ def format_duration(seconds):
     """
 
     if seconds is None:
-        return "N/A"
+        return "-"
 
     try:
         seconds = float(seconds)
     except (TypeError, ValueError):
-        return "N/A"
+        return "-"
 
     if seconds < 60:
         value = round(seconds)
@@ -1093,7 +1093,7 @@ async def poynt_orders(
     oldest_order_at = None
     newest_order_at = None
     order_span_time_duration_display = None
-    average_seconds_display = "N/A"    
+    average_seconds_display = "-"    
 
     order_times = []
 
@@ -1101,7 +1101,10 @@ async def poynt_orders(
     total_items = 0.0
     total_tips = 0.0
     average_seconds_between_items = None
-    average_seconds_between_items_display = "N/A"    
+    average_seconds_between_items_display = "-"    
+    items_per_order_display = "-"
+    tip_ratio_display = '-'
+
 
     for order in orders:
         amounts = order.get("amounts") or {}
@@ -1167,17 +1170,20 @@ async def poynt_orders(
     else:
         total_items_display = str(total_items)
 
-    items_per_order = "N/A"
+    items_per_order = "-"
     if len(orders):
         items_per_order = float(total_items) / len(orders)
 
-    tip_ratio = "N/A"
+    tip_ratio = "-"
     if total_revenue:
         tip_ratio = float(total_tips) / total_revenue 
 
-    items_per_order_display = f"{items_per_order:,.2f}"
-        
-    tip_ratio_display = f"{tip_ratio:,.1%}"
+    if isinstance(items_per_order, int):
+        items_per_order_display = f"{items_per_order:,.2f}"
+
+    if isinstance(tip_ratio, float):    
+        tip_ratio_display = f"{tip_ratio:,.1%}"
+
     total_revenue_display = f"${total_revenue:,.2f}"
     total_tips_display = f"${total_tips:,.2f}"
 
@@ -1188,20 +1194,24 @@ async def poynt_orders(
     fastest_1_item_display = (
         f"{fastest_1_item:.1f}"
         if fastest_1_item is not None
-        else "N/A"
+        else "-"
     )
 
     fastest_2_item_display = (
         f"{fastest_2_item:.1f}"
         if fastest_2_item is not None
-        else "N/A"
+        else "-"
     )
 
     fastest_3_item_display = (
         f"{fastest_3_item:.1f}"
         if fastest_3_item is not None
-        else "N/A"
+        else "-"
     )    
+
+    chart_display_flag = ""
+    if not len(orders):
+        chart_display_flag = "display: none;"    
 
     if order_times:
         oldest_order_at = min(order_times)
@@ -1236,7 +1246,8 @@ async def poynt_orders(
                 f"{average_seconds_between_orders:.1f}"
             )
         else:
-            average_seconds_display = "N/A"
+            average_seconds_display = "-"
+
 
     if oldest_order_at and newest_order_at:
         oldest_order_iso = oldest_order_at.isoformat()
@@ -1546,6 +1557,7 @@ async def poynt_orders(
                     align-items: flex-start;
                     margin-bottom: 30px;
                     margin-top: 30px;
+                   {chart_display_flag}                    
                 }}
 
                 .report {{
@@ -1692,7 +1704,15 @@ async def poynt_orders(
                 display: flex;
                 justify-content: space-between; /* pushes first left, second right */
                 width: 100%; /* optional, but common */
-                }}                         
+                }}     
+
+                .charts {{
+                  {chart_display_flag}
+                }}     
+
+                .orders-list {{
+                    margin-top: 20px;
+                }}               
                                
             </style>
         </head>
@@ -1706,46 +1726,49 @@ async def poynt_orders(
                     <time id="page-loaded-time"></time>
                 </div>
             </div>
-            <div class="clearfix"></div>
-            <div>
-            <form method="get" action="/poynt/orders">
-
-                <div class="metrics-controls">
-
-                    <div class="date-field">
-                        <label for="start">Start</label>
-                        <input
-                            type="datetime-local"
-                            id="start"
-                            name="start"
-                            value="{start_input_value}"
-                        >
-                    </div>
-
-                    <div class="date-field">
-                        <label for="end">End</label>
-                        <input
-                            type="datetime-local"
-                            id="end"
-                            name="end"
-                            value="{end_input_value}"
-                        >
-                    </div>
-
-                    <button type="button" onclick="setToday()">
-                        Today
-                    </button>
-
-                    <button type="submit">
-                        Generate
-                    </button>
-
-                </div>
-
-            </form>
-            <div>
 
             <div class="clearfix"></div>
+
+            <div>
+                <form method="get" action="/poynt/orders">
+
+                    <div class="metrics-controls">
+
+                        <div class="date-field">
+                            <label for="start">Start</label>
+                            <input
+                                type="datetime-local"
+                                id="start"
+                                name="start"
+                                value="{start_input_value}"
+                            >
+                        </div>
+
+                        <div class="date-field">
+                            <label for="end">End</label>
+                            <input
+                                type="datetime-local"
+                                id="end"
+                                name="end"
+                                value="{end_input_value}"
+                            >
+                        </div>
+
+                        <button type="button" onclick="setToday()">
+                            Today
+                        </button>
+
+                        <button type="submit">
+                            Generate
+                        </button>
+
+                    </div>
+
+                </form>
+            <div>
+
+            <div class="clearfix"></div>
+
             <div>
                 <div class="dashboard-tidbit">
                     <strong>
@@ -1781,7 +1804,6 @@ async def poynt_orders(
 
             <div class="clearfix"></div>
 
-
             <div>
                 <div class="dashboard-tidbit">
                     Orders:
@@ -1816,7 +1838,9 @@ async def poynt_orders(
                     <strong>{average_seconds_between_items_display} sec</strong>
                 </div>
             </div>
+
             <div class="clearfix"></div>
+
             <div>    
                 <div class="dashboard-tidbit">
                     <strong>Fast Order Processing Times:</strong>
@@ -1833,25 +1857,30 @@ async def poynt_orders(
                     3 item:
                     <strong>{fastest_3_item_display} sec</strong>
                 </div>
-
             </div>
+
             <div class="clearfix"></div>
 
-            <div class="chart-container">
-                <h2>Time Between Orders</h2>
+            <div class="charts">
+                <div class="chart-container">
+                    <h2>Time Between Orders</h2>
 
-                <canvas id="orderIntervalChart"></canvas>
+                    <canvas id="orderIntervalChart"></canvas>
+                </div>
+
+                <div class="chart-container">
+                    <h2>Item Order Flow Rate</h2>
+                
+                    <canvas id="itemFlowChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h2>Revenue Flow Rate</h2>
+                    <canvas id="revenueFlowChart"></canvas>
+                </div>
             </div>
 
-            <div class="chart-container">
-                <h2>Item Order Flow Rate</h2>
-            
-                <canvas id="itemFlowChart"></canvas>
-            </div>
-            <div class="chart-container">
-                <h2>Revenue Flow Rate</h2>
-                <canvas id="revenueFlowChart"></canvas>
-            </div>
+            <div class="clearfix"></div>
+
             <div class="reports">
                 <div class="report">
                     <h2>Item Counts</h2>
@@ -1887,9 +1916,15 @@ async def poynt_orders(
                     </table>
                 </div>
             </div>        
+
+            <div class="clearfix"></div>
             
-            <strong>Orders:</strpmg>
-            {orders_html}
+            <hr>
+
+            <div class="orders-list">
+                <h2>Orders:</h2>
+                {orders_html}
+            <div>    
 
             <p>
                 <a href="/dashboard">
