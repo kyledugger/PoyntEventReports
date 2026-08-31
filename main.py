@@ -916,24 +916,7 @@ def validate_and_convert_iso_datetime(iso_string: str):
         return None
 
 
-
-
-@app.get("/poynt/orders", response_class=HTMLResponse)
-async def poynt_orders(
-    request: Request,
-    start: str = "",
-    end: str = "",
-):
-    user_id = request.session.get("user_id")
-
-    if not user_id:
-        return RedirectResponse(
-            "/login",
-            status_code=303
-        )
-    
-    start_input_value = start
-    end_input_value = end    
+def get_orders_date_range(start, end):
 
     start_at_date = validate_and_convert_iso_datetime(start)
     end_at_date = validate_and_convert_iso_datetime(end)
@@ -1013,6 +996,36 @@ async def poynt_orders(
     else:    
         end_at = end_at_date.isoformat()
 
+
+    return {
+        "live": live,
+        "start_at": start_at,
+        "end_at": end_at,
+    }
+
+
+@app.get("/poynt/orders", response_class=HTMLResponse)
+async def poynt_orders(
+    request: Request,
+    start: str = "",
+    end: str = "",
+):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    order_date_params = get_orders_date_range(start, end)
+    start_at = order_date_params['start_at']
+    end_at = order_date_params['end_at']
+    live = order_date_params['live']
+
+    # preserve inputs    
+    start_input_value = start
+    end_input_value = end    
 
     credentials = get_poynt_credentials(user_id)
 
@@ -1178,7 +1191,7 @@ async def poynt_orders(
     if total_revenue:
         tip_ratio = float(total_tips) / total_revenue 
 
-    if isinstance(items_per_order, int):
+    if isinstance(items_per_order, float):
         items_per_order_display = f"{items_per_order:,.2f}"
 
     if isinstance(tip_ratio, float):    
