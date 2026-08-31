@@ -523,6 +523,51 @@ def  get_prefix_counts(orders, sku_counts):   # Count units ordered by SKU prefi
     return prefix_counts            
 
 
+def format_duration(seconds):
+    """
+    Convert a duration in seconds into a human-friendly
+    value + unit string.
+    """
+
+    if seconds is None:
+        return "N/A"
+
+    try:
+        seconds = float(seconds)
+    except (TypeError, ValueError):
+        return "N/A"
+
+    if seconds < 60:
+        value = round(seconds)
+        unit = "second" if value == 1 else "seconds"
+
+    elif seconds < 3600:
+        value = round(seconds / 60, 1)
+
+        # Remove unnecessary .0
+        if value.is_integer():
+            value = int(value)
+
+        unit = "minute" if value == 1 else "minutes"
+
+    elif seconds < 86400:
+        value = round(seconds / 3600, 1)
+
+        if value.is_integer():
+            value = int(value)
+
+        unit = "hour" if value == 1 else "hours"
+
+    else:
+        value = round(seconds / 86400, 1)
+
+        if value.is_integer():
+            value = int(value)
+
+        unit = "day" if value == 1 else "days"
+
+    return f"{value} {unit}"
+
 def get_fastest_processing_times(orders):
     """
     Estimate best cashier processing pace by order complexity.
@@ -530,7 +575,7 @@ def get_fastest_processing_times(orders):
     For each order-complexity group:
       1 item
       2 items
-      3+ items
+      3 items
 
     Use the fastest 10% of valid order intervals, capped at 10
     intervals, and return the median of those intervals.
@@ -1047,7 +1092,7 @@ async def poynt_orders(
     # Determine the time span represented by the orders.
     oldest_order_at = None
     newest_order_at = None
-    order_span_minutes = None
+    order_span_time_duration_display = None
     average_seconds_display = "N/A"    
 
     order_times = []
@@ -1138,7 +1183,7 @@ async def poynt_orders(
 
     fastest_1_item = fastest_processing.get("1")
     fastest_2_item = fastest_processing.get("2")
-    fastest_3_item = fastest_processing.get("3+")
+    fastest_3_item = fastest_processing.get("3")
 
     fastest_1_item_display = (
         f"{fastest_1_item:.1f}"
@@ -1175,7 +1220,9 @@ async def poynt_orders(
                 f"{average_seconds_between_items:.1f}"
             )
 
-        order_span_minutes = order_span_seconds / 60
+        format_duration    
+
+        order_span_time_duration_display = format_duration(order_span_seconds)
 
         if len(order_times) > 1:
             average_seconds_between_orders = (
@@ -1195,10 +1242,6 @@ async def poynt_orders(
         oldest_order_iso = oldest_order_at.isoformat()
         newest_order_iso = newest_order_at.isoformat()
 
-        if order_span_minutes.is_integer():
-            order_span_display = str(int(order_span_minutes))
-        else:
-            order_span_display = f"{order_span_minutes:.1f}"
     else:
         oldest_order_iso = ""
         newest_order_iso = ""
@@ -1630,21 +1673,41 @@ async def poynt_orders(
                     display: inline;
                 }}
                 .dashboard-load {{
+                    padding-top: 37px;
                     font-style: italic;
+                    float: right:
+                }}
+
+                .main_head {{
+                    float: left;
                 }}
 
                 .clearfix::after {{
                 content: "";
                 clear: both;
                 display: table;
-                }}                
+                }}
+
+                .row {{
+                display: flex;
+                justify-content: space-between; /* pushes first left, second right */
+                width: 100%; /* optional, but common */
+                }}                         
                                
             </style>
         </head>
 
         <body>
 
-            <h1>Orders Report</h1>
+            <div class="row">
+                <div class="main_head"><h1>Orders Report</h1></div>
+                <div class="dashboard-load">
+                    Loaded:
+                    <time id="page-loaded-time"></time>
+                </div>
+            </div>
+            <div class="clearfix"></div>
+            <div>
             <form method="get" action="/poynt/orders">
 
                 <div class="metrics-controls">
@@ -1680,10 +1743,18 @@ async def poynt_orders(
                 </div>
 
             </form>
+            <div>
 
-            <div class="clearfix">
+            <div class="clearfix"></div>
+            <div>
                 <div class="dashboard-tidbit">
+                    <strong>
                     Orders span:
+                    </strong>
+                </div>            
+                    
+
+                <div class="dashboard-tidbit">
                     <strong>
                         <time
                             class="local-time"
@@ -1703,74 +1774,75 @@ async def poynt_orders(
                     </strong>
                 </div>            
                 <div class="dashboard-tidbit">
-                    <strong>{order_span_display} minutes</strong>
+                    <strong>{order_span_time_duration_display}</strong>
                 </div>
 
             </div>  
 
+            <div class="clearfix"></div>
 
-            <div class="dashboard-tidbit">
-                Orders:
-                <strong>{summary_text}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Revenue:
-                <strong>{total_revenue_display}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Items:
-                <strong>{total_items_display}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Items per Order:
-                <strong>{items_per_order_display}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Tips:
-                <strong>{total_tips_display}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Tip Ratio:
-                <strong>{tip_ratio_display}</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Avg order:
-                <strong>{average_seconds_display} sec</strong>
-            </div>
-            <div class="dashboard-tidbit">
-                Avg item:
-                <strong>{average_seconds_between_items_display} sec</strong>
+
+            <div>
+                <div class="dashboard-tidbit">
+                    Orders:
+                    <strong>{summary_text}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Revenue:
+                    <strong>{total_revenue_display}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Items:
+                    <strong>{total_items_display}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Items per Order:
+                    <strong>{items_per_order_display}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Tips:
+                    <strong>{total_tips_display}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Tip Ratio:
+                    <strong>{tip_ratio_display}</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Avg order:
+                    <strong>{average_seconds_display} sec</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    Avg item:
+                    <strong>{average_seconds_between_items_display} sec</strong>
+                </div>
             </div>
             <div class="clearfix"></div>
-            <div class="dashboard-tidbit">
-                <strong>Fast Order Processing Times:</strong>
-            </div>              
+            <div>    
+                <div class="dashboard-tidbit">
+                    <strong>Fast Order Processing Times:</strong>
+                </div>              
+                <div class="dashboard-tidbit">
+                    1 item:
+                    <strong>{fastest_1_item_display} sec</strong>
+                </div>            
+                <div class="dashboard-tidbit">
+                    2 item:
+                    <strong>{fastest_2_item_display} sec</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    3 item:
+                    <strong>{fastest_3_item_display} sec</strong>
+                </div>
 
-            <div class="dashboard-tidbit">
-                1 item:
-                <strong>{fastest_1_item_display} sec</strong>
-            </div>            
-            <div class="dashboard-tidbit">
-                2 item:
-                <strong>{fastest_2_item_display} sec</strong>
             </div>
-            <div class="dashboard-tidbit">
-                3 item:
-                <strong>{fastest_3_item_display} sec</strong>
-            </div>
-        
-         
             <div class="clearfix"></div>
-            <div class="dashboard-load">
-                Loaded:
-                <time id="page-loaded-time"></time>
-            </div>
 
             <div class="chart-container">
                 <h2>Time Between Orders</h2>
 
                 <canvas id="orderIntervalChart"></canvas>
             </div>
+
             <div class="chart-container">
                 <h2>Item Order Flow Rate</h2>
             
