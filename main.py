@@ -7,6 +7,10 @@ from urllib.parse import urlencode
 from html import escape
 import json
 
+from sku_map import fix_sku
+
+from categories import sku_prefix_to_category_map
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -519,6 +523,111 @@ def  get_prefix_counts(orders, sku_counts):   # Count units ordered by SKU prefi
     return prefix_counts            
 
 
+def get_fastest_processing_times(orders):
+    """
+    Estimate best cashier processing pace by order complexity.
+
+    For each order-complexity group:
+      1 item
+      2 items
+      3+ items
+
+    Use the fastest 10% of valid order intervals, capped at 10
+    intervals, and return the median of those intervals.
+
+    The interval is attributed to the newer order.
+    """
+
+    chronological_orders = sorted(
+        orders,
+        key=lambda order: order.get("createdAt", "")
+    )
+
+    intervals_by_size = {
+        "1": [],
+        "2": [],
+        "3": [],
+    }
+
+    previous_time = None
+
+    for order in chronological_orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            current_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            continue
+
+        # We need a previous order to establish an interval.
+        if previous_time is not None:
+            interval_seconds = (
+                current_time - previous_time
+            ).total_seconds()
+
+            # Count total units in this order.
+            total_items = 0
+
+            for item in order.get("items") or []:
+                quantity = item.get("quantity", 0)
+
+                try:
+                    total_items += float(quantity)
+                except (TypeError, ValueError):
+                    continue
+
+            if total_items == 1:
+                group = "1"
+            elif total_items == 2:
+                group = "2"
+            elif total_items == 3:
+                group = "3"
+            else:
+                group = None
+
+            if group is not None and interval_seconds >= 0:
+                intervals_by_size[group].append(
+                    interval_seconds
+                )
+
+        previous_time = current_time
+
+    results = {}
+
+    for group, intervals in intervals_by_size.items():
+
+        if not intervals:
+            results[group] = None
+            continue
+
+        # Fastest 10%, capped at 10 intervals.
+        sample_size = min(
+            10,
+            max(1, (len(intervals) + 9) // 10)
+        )
+
+        fastest_intervals = sorted(intervals)[:sample_size]
+
+        # Median without requiring another import.
+        middle = len(fastest_intervals) // 2
+
+        if len(fastest_intervals) % 2:
+            median_seconds = fastest_intervals[middle]
+        else:
+            median_seconds = (
+                fastest_intervals[middle - 1]
+                + fastest_intervals[middle]
+            ) / 2
+
+        results[group] = median_seconds
+
+    return results
+
 def get_order_intervals(orders):
     # Build chronological order interval data for Chart #1.
     # Each point represents the number of seconds since the
@@ -1000,6 +1109,8 @@ async def poynt_orders(
     order_intervals = get_order_intervals(orders)
     chart_data_json = json.dumps(order_intervals)
 
+    fastest_processing = get_fastest_processing_times(orders)
+
     item_flow = get_item_flow(orders)
     item_flow_json = json.dumps(item_flow)    
 
@@ -1024,6 +1135,28 @@ async def poynt_orders(
     tip_ratio_display = f"{tip_ratio:,.1%}"
     total_revenue_display = f"${total_revenue:,.2f}"
     total_tips_display = f"${total_tips:,.2f}"
+
+    fastest_1_item = fastest_processing.get("1")
+    fastest_2_item = fastest_processing.get("2")
+    fastest_3_item = fastest_processing.get("3+")
+
+    fastest_1_item_display = (
+        f"{fastest_1_item:.1f}"
+        if fastest_1_item is not None
+        else "N/A"
+    )
+
+    fastest_2_item_display = (
+        f"{fastest_2_item:.1f}"
+        if fastest_2_item is not None
+        else "N/A"
+    )
+
+    fastest_3_item_display = (
+        f"{fastest_3_item:.1f}"
+        if fastest_3_item is not None
+        else "N/A"
+    )    
 
     if order_times:
         oldest_order_at = min(order_times)
@@ -1071,23 +1204,6 @@ async def poynt_orders(
         newest_order_iso = ""
         order_span_display = "Unknown"        
 
-    category_map = {
-        "ENE": "Drinks",
-        "N": "Drinks",
-        "REF": "Drinks",
-        "RF": "Drinks",
-        "BAR": "Ice Cream Bars",
-        "BR": "Ice Cream Bars",
-        "BAN": "Frozen Bananas",
-        "BN": "Frozen Bananas",
-        "SHAVE": "Shave Ice",
-        "SHV": "Shave Ice",
-        "COF": "Coffee",
-        "CF": "Coffee",
-        "WATER": "Water",
-        "WTR": "Water"
-    }  
-
     orders_json = json.dumps(orders)
 
     # Count units ordered by SKU across the displayed orders.
@@ -1097,7 +1213,7 @@ async def poynt_orders(
 
     prefix_rows = get_prefix_rows(prefix_counts)
 
-    category_rows = get_category_rows(category_map, prefix_counts)
+    category_rows = get_category_rows(sku_prefix_to_category_map, prefix_counts)
 
     if category_rows:
         category_html = "\n".join(category_rows)
@@ -1131,10 +1247,12 @@ async def poynt_orders(
         else:
             quantity_display = str(quantity)
 
+        sku = escape(str(sku))
+        sku = fix_sku(sku)
         sku_rows.append(
             f"""
             <tr>
-                <td>{escape(str(sku))}</td>
+                <td>{sku}</td>
                 <td>{quantity_display}</td>
             </tr>
             """
@@ -1229,9 +1347,11 @@ async def poynt_orders(
                 str(item.get("details") or "")
             )
 
+
             sku = escape(
                 str(item.get("sku") or "")
             )
+            sku = fix_sku(sku)
 
             status = escape(
                 str(item.get("status") or "")
@@ -1621,6 +1741,24 @@ async def poynt_orders(
                 Avg item:
                 <strong>{average_seconds_between_items_display} sec</strong>
             </div>
+            <div class="clearfix"></div>
+            <div class="dashboard-tidbit">
+                <strong>Fast Order Processing Times:</strong>
+            </div>              
+
+            <div class="dashboard-tidbit">
+                1 item:
+                <strong>{fastest_1_item_display} sec</strong>
+            </div>            
+            <div class="dashboard-tidbit">
+                2 item:
+                <strong>{fastest_2_item_display} sec</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                3 item:
+                <strong>{fastest_3_item_display} sec</strong>
+            </div>
+        
          
             <div class="clearfix"></div>
             <div class="dashboard-load">
@@ -1644,7 +1782,7 @@ async def poynt_orders(
             </div>
             <div class="reports">
                 <div class="report">
-                    <h2>Items Ordered</h2>
+                    <h2>Item Counts</h2>
 
                     <table>
                         <thead>
@@ -1661,7 +1799,7 @@ async def poynt_orders(
                 </div>
 
                 <div class="report">
-                    <h2>Categories</h2>
+                    <h2>Category Counts</h2>
 
                     <table>
                         <thead>
