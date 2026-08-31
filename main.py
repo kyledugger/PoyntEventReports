@@ -1011,7 +1011,9 @@ async def poynt_orders(
     else:
         total_items_display = str(total_items)
 
-    items_per_order = float(total_items) / len(orders)
+    items_per_order = 0
+    if len(orders):
+        items_per_order = float(total_items) / len(orders)
 
     tip_ratio = float(total_tips) / total_revenue 
 
