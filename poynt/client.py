@@ -232,7 +232,7 @@ class PoyntClient:
 
         return response.json()
     
-    async def get_recent_orders(self, limit=100, start_at=None, end_at=None) -> list[dict]:    
+    async def get_recent_orders(self, limit=100, start_at=None, end_at=None, fetch_all=False) -> list[dict]:    
         """
         Get the most recent orders for this business.
 
@@ -296,32 +296,91 @@ class PoyntClient:
             if total_count == 0:
                 return []
 
-            # If fewer than `limit` orders exist, start at zero.
-            start_offset = max(0, total_count - limit)
+            # ----
+
+            if fetch_all:
+                start_offset = 0
+            else:
+                # Normal behavior: return only the most recent `limit` orders.
+                start_offset = max(0, total_count - limit)
+
+            all_orders = []
+
+            while start_offset < total_count:
+
+                page_limit = min(limit, total_count - start_offset)
+
+                logger.info(
+                    "Poynt recent orders request starting: "
+                    "limit=%d, start_offset=%d, total_orders=%d, fetch_all=%s.",
+                    page_limit,
+                    start_offset,
+                    total_count,
+                    fetch_all,
+                )
+
+                params = {
+                    "limit": page_limit,
+                    "startOffset": start_offset,
+                }
+
+                if start_at:
+                    params["startAt"] = start_at
+
+                if end_at:
+                    params["endAt"] = end_at
+
+                response = await client.get(
+                    url,
+                    headers=self._headers(),
+                    params=params,
+                )
+
+                if not response.is_success:
+                    logger.error(
+                        "Poynt recent orders request failed: HTTP %d",
+                        response.status_code,
+                    )
+
+                    raise PoyntAPIError(
+                        f"Poynt API returned HTTP "
+                        f"{response.status_code}"
+                    )
+
+                data = response.json()
+                page_orders = data.get("orders", [])
+
+                logger.info(
+                    "Poynt orders page received: "
+                    "start_offset=%d, orders_received=%d.",
+                    start_offset,
+                    len(page_orders),
+                )
+
+                all_orders.extend(page_orders)
+
+                if not fetch_all:
+                    break
+
+                if not page_orders:
+                    break
+
+                start_offset += len(page_orders)
+
+                if len(page_orders) < page_limit:
+                    break
 
             logger.info(
-                "Poynt recent orders request starting: "
-                "limit=%d, start_offset=%d, total_orders=%d.",
-                limit,
-                start_offset,
-                total_count,
+                "Poynt recent orders request succeeded: "
+                "total_orders_returned=%d.",
+                len(all_orders),
             )
 
-            params = {
-                "limit": limit,
-                "startOffset": start_offset,
-            }
+            return all_orders
 
-            if start_at:
-                params["startAt"] = start_at            
-            if end_at:
-                params["endAt"] = end_at            
 
-            response = await client.get(
-                url,
-                headers=self._headers(),
-                params=params,
-            )
+
+            #----
 
         if not response.is_success:
             logger.error(

@@ -890,6 +890,7 @@ async def poynt_orders(
                 100,
                 start_at=start_at,
                 end_at=end_at,
+                fetch_all = True
             )
 
     except PoyntReauthorizationRequired:
@@ -925,14 +926,7 @@ async def poynt_orders(
             status_code=502
         )
 
-    if live:
-        summary_text = (
-            f"Showing {len(orders)} orders from today."
-        )
-    else:
-        summary_text = (
-            f"Showing the most recent {len(orders)} orders."
-        )
+    summary_text = f"{len(orders)}"
 
     # Newest first.
     orders = sorted(
@@ -949,19 +943,59 @@ async def poynt_orders(
 
     order_times = []
 
-    for order in orders:
-        created_at = order.get("createdAt")
+    total_revenue = 0.0
+    total_items = 0.0
+    total_tips = 0.0
+    average_seconds_between_items = None
+    average_seconds_between_items_display = "N/A"    
 
-        if not created_at:
-            continue
+    for order in orders:
+        amounts = order.get("amounts") or {}
+
+        # Revenue
+        total = amounts.get("netTotal")
+
+        if total is None:
+            total = amounts.get("orderAmount")
 
         try:
-            order_time = datetime.fromisoformat(
-                created_at.replace("Z", "+00:00")
-            )
-            order_times.append(order_time)
+            total_revenue += float(total) / 100
         except (TypeError, ValueError):
-            continue
+            pass
+
+        # Tips
+        capturedTotals = amounts.get("capturedTotals")   
+        if capturedTotals:    
+            tip = capturedTotals.get("tipAmount")
+        else:
+            tip = 0    
+
+        try:
+            total_tips += (float(tip) / 100)
+        except (TypeError, ValueError):
+            pass
+
+        # Items
+        for item in order.get("items") or []:
+            quantity = item.get("quantity", 0)
+
+            try:
+                total_items += float(quantity)
+            except (TypeError, ValueError):
+                pass
+
+        # Order timestamp
+        created_at = order.get("createdAt")
+
+        if created_at:
+            try:
+                order_time = datetime.fromisoformat(
+                    created_at.replace("Z", "+00:00")
+                )
+                order_times.append(order_time)
+            except (TypeError, ValueError):
+                logger.warning("missing created at for order: %s", order)
+                pass
 
     order_intervals = get_order_intervals(orders)
     chart_data_json = json.dumps(order_intervals)
@@ -972,6 +1006,21 @@ async def poynt_orders(
     revenue_flow = get_revenue_flow(orders)
     revenue_flow_json = json.dumps(revenue_flow)    
 
+    if total_items.is_integer():
+        total_items_display = str(int(total_items))
+    else:
+        total_items_display = str(total_items)
+
+    items_per_order = float(total_items) / len(orders)
+
+    tip_ratio = float(total_tips) / total_revenue 
+
+    items_per_order_display = f"{items_per_order:,.2f}"
+        
+    tip_ratio_display = f"${tip_ratio:,.1%}"
+    total_revenue_display = f"${total_revenue:,.2f}"
+    total_tips_display = f"${total_tips:,.2f}"
+
     if order_times:
         oldest_order_at = min(order_times)
         newest_order_at = max(order_times)
@@ -979,6 +1028,15 @@ async def poynt_orders(
         order_span_seconds = (
             newest_order_at - oldest_order_at
         ).total_seconds() 
+
+        if total_items > 1:
+            average_seconds_between_items = (
+                order_span_seconds / (total_items - 1)
+            )
+
+            average_seconds_between_items_display = (
+                f"{average_seconds_between_items:.1f}"
+            )
 
         order_span_minutes = order_span_seconds / 60
 
@@ -1320,14 +1378,21 @@ async def poynt_orders(
                     gap: 30px;
                     align-items: flex-start;
                     margin-bottom: 30px;
+                    margin-top: 30px;
                 }}
 
                 .report {{
                     width: 400px;
+                    padding: 30px;
+                    background-color: #f2f2f2;
+                    border-radius: 10x;
+                    border-collapse: separate;                    
                 }}
 
                 .report h2 {{
-                    margin-bottom: 10px;
+                    margin-bottom: 20px;
+                    margin-top:0px;
+                    padding: 0px;
                 }}  
 
                 .product_name {{ 
@@ -1360,7 +1425,7 @@ async def poynt_orders(
                     position: relative;
                     width: 100%;
                     height: 350px;
-                    margin-bottom: 30px;
+                    margin-bottom: 50px;
                 }}
 
                 .chart-container h2 {{
@@ -1382,7 +1447,7 @@ async def poynt_orders(
                     vertical-align: top;                                         
                 }}
                 .notes {{
-                    width: 600px;
+                    width: 800px;
                     overflow: hidden;
                     display: inline-block;
                     white-space: nowrap;   
@@ -1421,7 +1486,35 @@ async def poynt_orders(
                     cursor: pointer;
                 }}                
 
-               
+                .dashboard-tidbit {{
+                    margin-right: 5px;
+                    margin-bottom: 5px;
+                    margin-top: 5px;
+                    padding: 6px;
+                    float: left;
+                    display: inline;
+                    border: 1px solid black;                                        
+                    background-color: #f1f1f1;
+                    border-radius: 6x;
+                    border-collapse: separate;                    
+                }}
+
+                .dashboard-dash {{
+                    margin-right: 5px;
+                    padding: 5px;
+                    float: left;
+                    display: inline;
+                }}
+                .dashboard-load {{
+                    font-style: italic;
+                }}
+
+                .clearfix::after {{
+                content: "";
+                clear: both;
+                display: table;
+                }}                
+                               
             </style>
         </head>
 
@@ -1463,36 +1556,73 @@ async def poynt_orders(
                 </div>
 
             </form>
-            <p class="summary">
-                {summary_text}
-            </p>
 
-            <p>
-                Orders span:
-                <strong>
-                    <time
-                        class="local-time"
-                        datetime="{oldest_order_iso}"
-                    >{oldest_order_iso}</time>
-                </strong>
-                through
-                <strong>
-                    <time
-                        class="local-time"
-                        datetime="{newest_order_iso}"
-                    >{newest_order_iso}</time>
-                </strong>
-                |
-                <strong>{order_span_display} minutes</strong>
-    |
-                <strong>{average_seconds_display} sec/order</strong>                
+            <div class="clearfix">
+                <div class="dashboard-tidbit">
+                    Orders span:
+                    <strong>
+                        <time
+                            class="local-time"
+                            datetime="{oldest_order_iso}"
+                        >{oldest_order_iso}</time>
+                    </strong>
+                </div>            
+                <div class="dashboard-dash">
+                    <strong>-</strong>
+                </div>
+                <div class="dashboard-tidbit">
+                    <strong>
+                        <time
+                            class="local-time"
+                            datetime="{newest_order_iso}"
+                        >{newest_order_iso}</time>
+                    </strong>
+                </div>            
+                <div class="dashboard-tidbit">
+                    <strong>{order_span_display} minutes</strong>
+                </div>
 
-            </p>            
+            </div>  
 
-            <p>
+
+            <div class="dashboard-tidbit">
+                Orders:
+                <strong>{summary_text}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Revenue:
+                <strong>{total_revenue_display}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Items:
+                <strong>{total_items_display}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Items per Order:
+                <strong>{items_per_order_display}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Tips:
+                <strong>{total_tips_display}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Tip Ratio:
+                <strong>{tip_ratio_display}</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Avg order:
+                <strong>{average_seconds_display} sec</strong>
+            </div>
+            <div class="dashboard-tidbit">
+                Avg item:
+                <strong>{average_seconds_between_items_display} sec</strong>
+            </div>
+         
+            <div class="clearfix"></div>
+            <div class="dashboard-load">
                 Loaded:
                 <time id="page-loaded-time"></time>
-            </p>
+            </div>
 
             <div class="chart-container">
                 <h2>Time Between Orders</h2>
@@ -1544,7 +1674,7 @@ async def poynt_orders(
                 </div>
             </div>        
             
-
+            <strong>Orders:</strpmg>
             {orders_html}
 
             <p>
