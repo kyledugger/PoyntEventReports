@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>        
+    <title>Orders Report</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+        }
+
+        .summary {
+            margin-bottom: 10px;
+        }
+
+        .order {
+            margin-bottom: 25px;
+            border: 1px solid #aaa;
+            padding: 12px;
+        }
+
+        .order-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .status {
+            margin-left: 10px;
+            font-size: 14px;
+            font-weight: normal;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border: 1px solid #ccc;
+            padding: 7px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            font-weight: bold;
+        }
+        .sku-summary {
+            margin-bottom: 30px;
+        }
+
+        .sku-summary table {
+            width: 400px;
+        }
+
+        .sku-summary th,
+        .sku-summary td {
+            padding: 7px;
+        } 
+        .reports {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            margin-bottom: 30px;
+            margin-top: 30px;
+            {{chart_display_flag}}                    
+        }
+
+        .report {
+            width: 400px;
+            padding: 30px;
+            background-color: #f2f2f2;
+            border-radius: 10x;
+            border-collapse: separate;                    
+        }
+
+        .report h2 {
+            margin-bottom: 20px;
+            margin-top:0px;
+            padding: 0px;
+        }  
+
+        .product_name { 
+            width: 300px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;                
+        }
+        .product_qty { 
+            width: 50px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;                   
+        }
+        .product_sku { 
+            width: 200px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;                   
+        
+        }
+        .order_notes { 
+            width: 300px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;                   
+        }                
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 350px;
+            margin-bottom: 50px;
+        }
+
+        .chart-container h2 {
+            margin-bottom: 10px;
+        }
+
+        .notes-container {
+            margin-bottom: 5px;
+        }
+        .notes_header {
+            font-weight: bold;
+            width: 50px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;
+            border: 1px solid #ccc;
+            padding: 7px;
+            text-align: left;
+            vertical-align: top;                                         
+        }
+        .notes {
+            width: 800px;
+            overflow: hidden;
+            display: inline-block;
+            white-space: nowrap;   
+            border: 1px solid #ccc;
+            padding: 7px;
+            text-align: left;
+            vertical-align: top;                                      
+        }
+
+        .metrics-controls {
+            display: flex;
+            align-items: flex-end;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .date-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .date-field label {
+            font-weight: bold;
+        }
+
+        .date-field input {
+            font-size: 16px;
+            padding: 7px;
+        }
+
+        .metrics-controls button {
+            font-size: 16px;
+            padding: 7px 14px;
+            cursor: pointer;
+        }                
+
+        .dashboard-tidbit {
+            margin-right: 5px;
+            margin-bottom: 5px;
+            margin-top: 5px;
+            padding: 6px;
+            float: left;
+            display: inline;
+            border: 1px solid black;                                        
+            background-color: #f1f1f1;
+            border-radius: 6x;
+            border-collapse: separate;                    
+        }
+
+        .dashboard-dash {
+            margin-right: 5px;
+            padding: 5px;
+            float: left;
+            display: inline;
+        }
+        .dashboard-load {
+            padding-top: 37px;
+            font-style: italic;
+            float: right:
+        }
+
+        .main_head {
+            float: left;
+        }
+
+        .clearfix::after {
+        content: "";
+        clear: both;
+        display: table;
+        }
+
+        .row {
+        display: flex;
+        justify-content: space-between; /* pushes first left, second right */
+        width: 100%; /* optional, but common */
+        }     
+
+        .charts {
+            {{chart_display_flag}}
+        }     
+
+        .orders-list {
+            margin-top: 20px;
+        }       
+            
+                        
+    </style>
+</head>
+
+<body>
+
+    <div class="row">
+        <div class="main_head"><h1>Orders Report</h1></div>
+        <div class="dashboard-load">
+            Loaded:
+            <time id="page-loaded-time"></time>
+        </div>
+    </div>
+
+    <div class="clearfix"></div>
+
+    <div>
+        <form method="get" action="/poynt/orders">
+
+            <div class="metrics-controls">
+
+                <div class="date-field">
+                    <label for="start">Start</label>
+                    <input
+                        type="datetime-local"
+                        id="start"
+                        name="start"
+                        value="{{start_input_value}}"
+                    >
+                </div>
+
+                <div class="date-field">
+                    <label for="end">End</label>
+                    <input
+                        type="datetime-local"
+                        id="end"
+                        name="end"
+                        value="{{end_input_value}}"
+                    >
+                </div>
+
+                <button type="button" onclick="setToday()">
+                    Today
+                </button>
+
+                <button type="submit">
+                    Generate
+                </button>
+
+            </div>
+
+        </form>
+    <div>
+
+    <div class="clearfix"></div>
+
+    <div>
+        <div class="dashboard-tidbit">
+            <strong>
+            Orders span:
+            </strong>
+        </div>            
+            
+
+        <div class="dashboard-tidbit">
+            <strong>
+                <time
+                    class="local-time"
+                    datetime="{{oldest_order_iso}}"
+                >{{oldest_order_iso}}</time>
+            </strong>
+        </div>            
+        <div class="dashboard-dash">
+            <strong>-</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            <strong>
+                <time
+                    class="local-time"
+                    datetime="{{newest_order_iso}}"
+                >{{newest_order_iso}}</time>
+            </strong>
+        </div>            
+        <div class="dashboard-tidbit">
+            <strong>{{order_span_time_duration_display}}</strong>
+        </div>
+
+    </div>  
+
+    <div class="clearfix"></div>
+
+    <div>
+        <div class="dashboard-tidbit">
+            Orders:
+            <strong>{{summary_text}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Cancelled Orders:
+            <strong>{{cancelled_order_count}}</strong>
+        </div>
+        
+        <div class="dashboard-tidbit">
+            Revenue:
+            <strong>{{total_revenue_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Items:
+            <strong>{{total_items_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Items per Order:
+            <strong>{{items_per_order_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Tips:
+            <strong>{{total_tips_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Tip Ratio:
+            <strong>{{tip_ratio_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Avg order:
+            <strong>{{average_seconds_display}} sec</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Avg item:
+            <strong>{{average_seconds_between_items_display}} sec</strong>
+        </div>
+    </div>
+
+    <div class="clearfix"></div>
+
+    <div>    
+        <div class="dashboard-tidbit">
+            <strong>Fast Order Processing Times:</strong>
+        </div>              
+        <div class="dashboard-tidbit">
+            1 item:
+            <strong>{{fastest_1_item_display}} sec</strong>
+        </div>            
+        <div class="dashboard-tidbit">
+            2 item:
+            <strong>{{fastest_2_item_display}} sec</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            3 item:
+            <strong>{{fastest_3_item_display}} sec</strong>
+        </div>
+    </div>
+
+    <div class="clearfix"></div>
+
+    <div>
+        <h2>Stores:</h2>    
+        <div>
+            {{stores_display}}
+        </div>
+    <div>    
+
+    <div class="clearfix"></div>
+
+    <div class="charts">
+        <div class="chart-container">
+            <h2>Time Between Orders</h2>
+
+            <canvas id="orderIntervalChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h2>Item Order Flow Rate</h2>
+        
+            <canvas id="itemFlowChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h2>Revenue Flow Rate</h2>
+            <canvas id="revenueFlowChart"></canvas>
+        </div>
+    </div>
+
+    <div class="clearfix"></div>
+
+    <div class="reports">
+        <div class="report">
+            <h2>Item Counts</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Units</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {{sku_html | safe}}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="report">
+            <h2>Category Counts</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Units</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {{category_html | safe}}
+                </tbody>
+            </table>
+        </div>
+    </div>        
+
+    <div class="clearfix"></div>
+    
+    <hr>
+
+    <div class="orders-list">
+        <h2>Orders:</h2>
+        {{orders_html | safe}}
+    <div>    
+
+    <p>
+        <a href="/dashboard">
+            Return to Dashboard
+        </a>
+    </p>
+
+    <script>
+    
+        document
+            .querySelectorAll(".local-time")
+            .forEach(function(element) {
+                const value =
+                    element.getAttribute("datetime");
+
+                if (!value) {
+                    return;
+                }
+
+                const date = new Date(value);
+
+                if (isNaN(date.getTime())) {
+                    return;
+                }
+
+                const formatted =
+                    new Intl.DateTimeFormat(
+                        undefined,
+                        {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: true
+                        }
+                    ).format(date);
+
+                element.textContent =
+                    formatted.replace(
+                        / at /,
+                        " | "
+                    );
+            });
+
+        const loadedTime =
+            document.getElementById(
+                "page-loaded-time"
+            );
+
+        if (loadedTime) {
+            const now = new Date();
+
+            loadedTime.textContent =
+                new Intl.DateTimeFormat(
+                    undefined,
+                    {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true
+                    }
+                ).format(now).replace(
+                    / at /,
+                    " | "
+                );
+        }
+        const orderIntervalData = {{chart_data_json  | safe}};
+
+        const orderIntervalCanvas =
+            document.getElementById("orderIntervalChart");
+
+        if (orderIntervalCanvas && orderIntervalData.length > 0) {
+            new Chart(orderIntervalCanvas, {
+                type: "line",
+
+                data: {
+                    datasets: [{
+                        label: "Seconds Between Orders",
+
+                        data: orderIntervalData.map(function(point) {
+                            return {
+                                x: new Date(point.time),
+                                y: point.seconds
+                            };
+                        }),
+
+                        tension: 0.0,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+
+                    interaction: {
+                        mode: "nearest",
+                        intersect: false
+                    },
+
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const date = new Date(context[0].parsed.x);
+
+                                    return new Intl.DateTimeFormat(
+                                        undefined,
+                                        {
+                                            weekday: "short",
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            hour12: true
+                                        }
+                                    ).format(date);
+                                },
+
+                                label: function(context) {
+                                    return context.parsed.y + " seconds between orders";
+                                }
+                            }
+                        }                            
+                    },
+
+                    scales: {
+                        x: {
+                            type: "time",
+
+                            time: {
+                                unit: "minute",
+                                stepSize: 5,
+                                displayFormats: {
+                                    minute: "h:mm a"
+                                },
+                                tooltipFormat: "h:mm a"
+                            },
+
+                            ticks: {
+                                stepSize: 5
+                            },
+
+                            title: {
+                                display: true,
+                                text: "Order Time"
+                            }
+                        },
+
+                        y: {
+                            beginAtZero: true,
+
+                            title: {
+                                display: true,
+                                text: "Seconds"
+                            }
+                        }
+                    }
+                }
+            });
+        }    
+
+        const itemFlowData = {{item_flow_json | safe}};
+
+        const itemFlowCanvas =
+            document.getElementById("itemFlowChart");
+
+        if (itemFlowCanvas && itemFlowData.length > 0) {
+            new Chart(itemFlowCanvas, {
+                type: "bar",
+
+                data: {
+                    datasets: [{
+                        label: "Items Ordered",
+
+                        data: itemFlowData.map(function(point) {
+                            return {
+                                x: new Date(point.time),
+                                y: point.items
+                            };
+                        }),
+
+                        barThickness: "flex"
+                    }]
+                },
+
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return new Intl.DateTimeFormat(
+                                        undefined,
+                                        {
+                                            weekday: "short",
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            hour12: true
+                                        }
+                                    ).format(context[0].parsed.x);
+                                },
+
+                                label: function(context) {
+                                    return context.parsed.y
+                                        + " items ordered";
+                                }
+                            }
+                        }
+                    },
+
+                    scales: {
+                        x: {
+                            type: "time",
+
+                            time: {
+                                tooltipFormat: "MMM d, h:mm a"
+                            },
+
+                            title: {
+                                display: true,
+                                text: "Order Time"
+                            }
+                        },
+
+                        y: {
+                            beginAtZero: true,
+
+                            title: {
+                                display: true,
+                                text: "Items per 5 Minutes"
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        const revenueFlowData = {{revenue_flow_json | safe}};
+
+        const revenueFlowCanvas =
+            document.getElementById("revenueFlowChart");
+
+        if (revenueFlowCanvas && revenueFlowData.length > 0) {
+            new Chart(revenueFlowCanvas,{
+                type: "bar",
+
+                data:{
+                    datasets: [{
+                        label: "Revenue",
+                        data: revenueFlowData.map(function(point){
+                            return{
+                                x: new Date(point.time),
+                                y: point.revenue
+                            };
+                        }),
+
+                        barThickness: "flex"
+                    }]
+                },
+
+                options:{
+                    responsive: true,
+                    maintainAspectRatio: false,
+
+                    plugins:{
+                        legend:{
+                            display: false
+                        },
+
+                        tooltip:{
+                            callbacks:{
+                                title: function(context){
+                                    return new Intl.DateTimeFormat(
+                                        undefined,
+                                        {
+                                            weekday: "short",
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            hour12: true
+                                        }
+                                    ).format(context[0].parsed.x);
+                                },
+
+                                label: function(context){
+                                    return "$"
+                                        + context.parsed.y.toFixed(2)
+                                        + " revenue";
+                                }
+                            }
+                        }
+                    },
+
+                    scales:{
+                        x:{
+                            type: "time",
+
+                            time:{
+                                tooltipFormat: "MMM d, h:mm a"
+                            },
+
+                            title:{
+                                display: true,
+                                text: "Order Time"
+                            }
+                        },
+
+                        y:{
+                            beginAtZero: true,
+
+                            title:{
+                                display: true,
+                                text: "Dollars per 5 Minutes"
+                            },
+
+                            ticks:{
+                                callback: function(value){
+                                    return "$" + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } 
+        function setToday() {
+            const now = new Date();
+
+            const start = new Date(now);
+            start.setHours(0, 0, 0, 0);
+
+            const end = new Date(now);
+            end.setHours(23, 59, 59, 999);                    
+
+            function formatForDateTimeLocal(date) {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, "0");
+                const day = String(date.getDate()).padStart(2, "0");
+                const hours = String(date.getHours()).padStart(2, "0");
+                const minutes = String(date.getMinutes()).padStart(2, "0");
+
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
+
+            document.getElementById("start").value =
+                formatForDateTimeLocal(start);
+
+            document.getElementById("end").value =
+                formatForDateTimeLocal(end);
+        }                                                           
+    </script>
+</body>
+</html>
