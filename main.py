@@ -6,7 +6,6 @@ from devices import icc_stores
 import os
 import secrets
 from urllib.parse import urlencode
-from html import escape
 import json
 
 from sku_map import fix_sku
@@ -304,10 +303,17 @@ async def oauth_callback(
     user_id = request.session.get("user_id")
 
     if not user_id:
-        return HTMLResponse(
-            "<h1>OAuth Error</h1>"
-            "<p>Your Codelian login session could not be found.</p>",
-            status_code=401
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "OAuth Error",
+                "paragraphs": [
+                    "Your Codelian login session could not be found."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=401,
         )
     
     expected_context = request.session.get(
@@ -315,37 +321,63 @@ async def oauth_callback(
     )
 
     if not expected_context:
-        return HTMLResponse(
-            "<h1>OAuth Error</h1>"
-            "<p>No OAuth session was found.</p>",
-            status_code=400
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "OAuth Error",
+                "paragraphs": [
+                    "No OAuth session was found."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=400,
         )
 
     if not context or not secrets.compare_digest(
         context,
         expected_context
     ):
-        return HTMLResponse(
-            "<h1>OAuth Error</h1>"
-            "<p>OAuth context validation failed.</p>",
-            status_code=400
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "OAuth Error",
+                "paragraphs": [
+                    "OAuth context validation failed."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=400,
         )
 
     if not status or status.lower() != "success":
-        return HTMLResponse(
-            f"""
-            <h1>Poynt Authorization</h1>
-            <p>Authorization was not completed.</p>
-            <p>Status: {status or "unknown"}</p>
-            """,
-            status_code=400
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Authorization",
+                "paragraphs": [
+                    "Authorization was not completed.",
+                    f"Status: {status or 'unknown'}",
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=400,
         )
 
     if not code:
-        return HTMLResponse(
-            "<h1>OAuth Error</h1>"
-            "<p>Poynt did not provide an authorization code.</p>",
-            status_code=400
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "OAuth Error",
+                "paragraphs": [
+                    "Poynt did not provide an authorization code."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=400,
         )
 
     # OAuth response is valid.
@@ -366,24 +398,31 @@ async def oauth_callback(
             e,
         )
 
-        return HTMLResponse(
-            """
-            <h1>Poynt Token Error</h1>
-            <p>
-                Poynt authorization succeeded, but the
-                merchant token request failed.
-            </p>
-            <p>
-                Check the Render/application logs.
-            </p>
-            """,
-            status_code=502
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Token Error",
+                "paragraphs": [
+                    "Poynt authorization succeeded, but the merchant token request failed.",
+                    "Check the Render/application logs.",
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=502,
         )
 
     if not businessId:
-        return HTMLResponse(
-            "<h1>Poynt Error</h1>"
-            "<p>No business ID was returned.</p>",
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Error",
+                "paragraphs": [
+                    "No business ID was returned."
+                ],
+                "show_dashboard_link": False,
+            },
             status_code=400,
         )
 
@@ -424,15 +463,17 @@ async def poynt_catalog(request: Request):
     credentials = get_poynt_credentials(user_id)
 
     if not credentials:
-        return HTMLResponse(
-            """
-            <h1>Poynt Error</h1>
-            <p>No Poynt connection was found.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=404
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Error",
+                "paragraphs": [
+                    "No Poynt connection was found."
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=404,
         )
 
     try:
@@ -444,17 +485,17 @@ async def poynt_catalog(request: Request):
         catalogs = await client.get_catalogs()
 
     except PoyntReauthorizationRequired:
-        return HTMLResponse(
-            """
-            <h1>Poynt Authorization Required</h1>
-            <p>
-                Your Poynt authorization has expired.
-                Please reconnect your Poynt account.
-            </p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Authorization Required",
+                "paragraphs": [
+                    "Your Poynt authorization has expired.",
+                    "Please reconnect your Poynt account.",
+                ],
+                "show_dashboard_link": True,
+            },
             status_code=401,
         )
 
@@ -465,30 +506,31 @@ async def poynt_catalog(request: Request):
             flush=True
         )
 
-        return HTMLResponse(
-            """
-            <h1>Poynt Catalog Error</h1>
-            <p>The catalog request failed.</p>
-            <p>Check the application logs.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=502
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Catalog Error",
+                "paragraphs": [
+                    "The catalog request failed.",
+                    "Check the application logs.",
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=502,
         )
 
-    return HTMLResponse(
-        """
-        <h1>Poynt Catalog Success!</h1>
-        <p>Catalog request succeeded.</p>
-        <p>
-            The Poynt access token was retrieved from the
-            database and used to make this request.
-        </p>
-        <p>
-            <a href="/dashboard">Return to Dashboard</a>
-        </p>
-        """
+    return templates.TemplateResponse(
+        request=request,
+        name="message.html",
+        context={
+            "title": "Poynt Catalog Success!",
+            "paragraphs": [
+                "Catalog request succeeded.",
+                "The Poynt access token was retrieved from the database and used to make this request.",
+            ],
+            "show_dashboard_link": True,
+        },
     )
 
 def  get_prefix_counts(orders, sku_counts):   # Count units ordered by SKU prefix/category.
@@ -941,16 +983,10 @@ def get_orders_date_range(start, end):
     live = False
 
     if start_at_date and not end_at_date:
-        return HTMLResponse(
-            """
-            <h1>End Date Error</h1>
-            <p>enddate parameter was provided but is not valid</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=404
-        )
+        return {
+            "error_title": "End Date Error",
+            "error_message": "enddate parameter was provided but is not valid",
+        }
     
     if not start_at_date: 
         live = True
@@ -1306,6 +1342,7 @@ def get_stores_display(store_ids):
 
     return stores_display
 
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1321,6 +1358,21 @@ async def poynt_orders(
         )
 
     order_date_params = get_orders_date_range(start, end)
+
+    if "error_title" in order_date_params:
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": order_date_params["error_title"],
+                "paragraphs": [
+                    order_date_params["error_message"]
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=404,
+        )
+
     start_at = order_date_params['start_at']
     end_at = order_date_params['end_at']
     live = order_date_params['live']
@@ -1332,15 +1384,17 @@ async def poynt_orders(
     credentials = get_poynt_credentials(user_id)
 
     if not credentials:
-        return HTMLResponse(
-            """
-            <h1>Poynt Error</h1>
-            <p>No Poynt connection was found.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=404
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Error",
+                "paragraphs": [
+                    "No Poynt connection was found."
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=404,
         )
 
     try:
@@ -1353,17 +1407,17 @@ async def poynt_orders(
         )
 
     except PoyntReauthorizationRequired:
-        return HTMLResponse(
-            """
-            <h1>Poynt Authorization Required</h1>
-            <p>
-                Your Poynt authorization has expired.
-                Please reconnect your Poynt account.
-            </p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Authorization Required",
+                "paragraphs": [
+                    "Your Poynt authorization has expired.",
+                    "Please reconnect your Poynt account.",
+                ],
+                "show_dashboard_link": True,
+            },
             status_code=401,
         )
 
@@ -1373,16 +1427,18 @@ async def poynt_orders(
             e,
         )
 
-        return HTMLResponse(
-            """
-            <h1>Poynt Orders Error</h1>
-            <p>The recent orders request failed.</p>
-            <p>Check the application logs.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=502
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Orders Error",
+                "paragraphs": [
+                    "The recent orders request failed.",
+                    "Check the application logs.",
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=502,
         )
 
     summary_text = f"{len(orders)}"
@@ -1584,15 +1640,17 @@ async def poynt_stores(
     credentials = get_poynt_credentials(user_id)
 
     if not credentials:
-        return HTMLResponse(
-            """
-            <h1>Poynt Error</h1>
-            <p>No Poynt connection was found.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=404
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Error",
+                "paragraphs": [
+                    "No Poynt connection was found."
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=404,
         )
 
     try:
@@ -1604,17 +1662,17 @@ async def poynt_stores(
         businesses = await client.get_stores()
 
     except PoyntReauthorizationRequired:
-        return HTMLResponse(
-            """
-            <h1>Poynt Authorization Required</h1>
-            <p>
-                Your Poynt authorization has expired.
-                Please reconnect your Poynt account.
-            </p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Authorization Required",
+                "paragraphs": [
+                    "Your Poynt authorization has expired.",
+                    "Please reconnect your Poynt account.",
+                ],
+                "show_dashboard_link": True,
+            },
             status_code=401,
         )
 
@@ -1625,32 +1683,30 @@ async def poynt_stores(
             flush=True
         )
 
-        return HTMLResponse(
-            """
-            <h1>Poynt stores Error</h1>
-            <p>The stores request failed.</p>
-            <p>Check the application logs.</p>
-            <p>
-                <a href="/dashboard">Return to Dashboard</a>
-            </p>
-            """,
-            status_code=502
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt stores Error",
+                "paragraphs": [
+                    "The stores request failed.",
+                    "Check the application logs.",
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=502,
         )
 
-    return HTMLResponse(
-        f"""
-        <h1>Poynt Stores Success!</h1>
-        <p>Stores request succeeded.</p>
-        <p>
-            The Poynt access token was retrieved from the
-            database and used to make this request.
-        </p>
-        <p>
-        {businesses}
-        </p>
-        <p>
-            <a href="/dashboard">Return to Dashboard</a>
-        </p>
-        """
+    return templates.TemplateResponse(
+        request=request,
+        name="message.html",
+        context={
+            "title": "Poynt Stores Success!",
+            "paragraphs": [
+                "Stores request succeeded.",
+                "The Poynt access token was retrieved from the database and used to make this request.",
+            ],
+            "show_dashboard_link": True,
+        },
     )
     
