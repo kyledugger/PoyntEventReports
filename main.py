@@ -850,11 +850,12 @@ def get_revenue_flow(orders):
 
     return result
 
-def get_prefix_rows(prefix_counts):
-    prefix_rows = []
+def get_sku_rows(sku_counts):
+    """Prepare SKU count data for template rendering."""
+    sku_rows = []
 
-    for prefix, quantity in sorted(
-        prefix_counts.items(),
+    for sku, quantity in sorted(
+        sku_counts.items(),
         key=lambda x: (-x[1], x[0])
     ):
         if quantity.is_integer():
@@ -862,17 +863,16 @@ def get_prefix_rows(prefix_counts):
         else:
             quantity_display = str(quantity)
 
-        prefix_rows.append(
-            f"""
-            <tr>
-                <td>{escape(str(prefix))}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )    
-    return prefix_rows    
+        sku_rows.append({
+            "sku": fix_sku(str(sku)),
+            "quantity": quantity_display,
+        })
+
+    return sku_rows
+
 
 def get_category_rows(category_map, prefix_counts):
+    """Prepare category count data for template rendering."""
     category_counts = {}
 
     for prefix, quantity in prefix_counts.items():
@@ -893,15 +893,11 @@ def get_category_rows(category_map, prefix_counts):
         else:
             quantity_display = str(quantity)
 
-        category_rows.append(
-            f"""
-            <tr>
-                <td>{escape(str(category))}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )
-        
+        category_rows.append({
+            "category": str(category),
+            "quantity": quantity_display,
+        })
+
     return category_rows
 
 def validate_and_convert_iso_datetime(iso_string: str):
@@ -1182,52 +1178,38 @@ def prepare_chart_data(orders):
     }
 
 
-def get_orders_html(orders):
+def get_orders_data(orders):
     """
-    Generate the HTML for the displayed orders.
+    Prepare order data for the orders report.
 
     Returns:
-        orders_html: HTML string containing all order sections
+        orders_data: list of dictionaries containing order display data
         store_ids: set of store IDs found in the orders
     """
 
-    order_sections = []
+    orders_data = []
     store_ids = set()
 
     for order in orders:
-        order_number = escape(
-            str(
-                order.get(
-                    "orderNumber",
-                    order.get("id", "Unknown")
-                )
+
+        order_number = str(
+            order.get(
+                "orderNumber",
+                order.get("id", "Unknown")
             )
         )
 
-        if "transactions" in order:
-            transactions = order["transactions"]
+        transactions = order.get("transactions") or []
 
-            for transaction in transactions:
-                context = transaction["context"]
-                store_id = context["storeId"]
+        for transaction in transactions:
+            context = transaction.get("context") or {}
+            store_id = context.get("storeId")
+
+            if store_id:
                 store_ids.add(store_id)
 
-        created_at = escape(
-            str(order.get("createdAt", ""))
-        )
-
-        # Poynt's statuses object is documented as OrderStatuses.
-        # We don't assume a single exact structure here.
-        statuses = order.get("statuses") or {}
-
-        status = (
-            statuses.get("transactionStatusSummary")
-            if isinstance(statuses, dict)
-            else None
-        )
-
-        status_display = escape(
-            str(status or "Unknown")
+        created_at = str(
+            order.get("createdAt", "")
         )
 
         amounts = order.get("amounts") or {}
@@ -1245,123 +1227,57 @@ def get_orders_html(orders):
         if total is not None:
             try:
                 total_display = (
-                    f"{escape(str(currency))} "
+                    f"{currency} "
                     f"${int(total) / 100:.2f}"
                 )
             except (TypeError, ValueError):
-                total_display = escape(str(total))
+                total_display = str(total)
         else:
             total_display = "Unknown"
 
-        order_notes = escape(
-            str(order.get("notes") or "")
+        notes = str(
+            order.get("notes") or ""
         )
 
-        order_notes_HTML = ""
+        items_data = []
 
-        if order_notes:
-            order_notes_HTML = (
-                f"""<div class="notes-container"><table>"""
-                f"""<tr><td class="notes_header">Notes</td>"""
-                f"""<td class="notes">{order_notes}</td></tr>"""
-                f"""</table></div>"""
+        for item in order.get("items") or []:
+
+            name = str(
+                item.get("name") or ""
             )
 
-        items = order.get("items") or []
-
-        item_rows = []
-
-        for item in items:
-            name = escape(
-                str(item.get("name") or "")
+            quantity = str(
+                item.get("quantity") or ""
             )
 
-            quantity = escape(
-                str(item.get("quantity") or "")
-            )
-
-            sku = escape(
-                str(item.get("sku") or "")
+            sku = str(
+                item.get("sku") or ""
             )
 
             sku = fix_sku(sku)
 
-            item_status = escape(
-                str(item.get("status") or "")
+            item_status = str(
+                item.get("status") or ""
             )
 
-            item_rows.append(
-                f"""
-                <tr>
-                    <td class="product_name">{name}</td>
-                    <td class="product_qty">{quantity}</td>
-                    <td class="product_sku">{sku}</td>
-                    <td class="product_sku">{item_status}</td>
-                </tr>
-                """
-            )
+            items_data.append({
+                "name": name,
+                "quantity": quantity,
+                "sku": sku,
+                "status": item_status,
+            })
 
-        if item_rows:
-            items_html = "\n".join(item_rows)
-        else:
-            items_html = """
-                <tr>
-                    <td colspan="4">
-                        No order items.
-                    </td>
-                </tr>
-            """
+        orders_data.append({
+            "order_number": order_number,
+            "created_at": created_at,
+            "total_display": total_display,
+            "notes": notes,
+            "items": items_data,
+        })
 
-        order_sections.append(
-            f"""
-            <section class="order">
-                <div class="order-header">
-                    <div>
-                        <strong>Order {order_number}</strong>
-                    </div>
+    return orders_data, store_ids
 
-                    <div>
-                        <time
-                            class="local-time"
-                            datetime="{created_at}"
-                        >
-                            {created_at}
-                        </time>
-                    </div>
-
-                    <div>
-                        <strong>{total_display}</strong>
-                    </div>
-                </div>
-
-                {order_notes_HTML}
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="product_name">Item Name</th>
-                            <th class="product_qty">Qty</th>
-                            <th class="product_sku">SKU</th>
-                            <th class="product_sku">Status</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {items_html}
-                    </tbody>
-                </table>
-            </section>
-            """
-        )
-
-    if order_sections:
-        orders_html = "\n".join(order_sections)
-    else:
-        orders_html = """
-            <p>No orders were returned.</p>
-        """
-
-    return orders_html, store_ids
 
 def get_stores_display(store_ids):
     """
@@ -1590,13 +1506,14 @@ async def poynt_orders(
 
     prefix_counts = get_prefix_counts(orders, sku_counts)
 
-    prefix_rows = get_prefix_rows(prefix_counts)
+    sku_rows = get_sku_rows(sku_counts)
 
-    category_html = get_category_html(prefix_counts, prefix_rows)
+    category_rows = get_category_rows(
+        sku_prefix_to_category_map,
+        prefix_counts,
+    )
 
-    sku_html = get_skus_html(sku_counts)
-
-    orders_html, store_ids = get_orders_html(orders)
+    orders_data, store_ids = get_orders_data(orders)    
 
     stores_display = get_stores_display(store_ids)
 
@@ -1623,78 +1540,14 @@ async def poynt_orders(
             "start_input_value": start_input_value,
             "end_input_value": end_input_value,
             "stores_display": stores_display,
-            "sku_html": sku_html,
-            "category_html": category_html,
-            "orders_html": orders_html,
+            "sku_rows": sku_rows,
+            "category_rows": category_rows,
+            "orders_data": orders_data,
             "chart_data_json": chart_data_json,
             "item_flow_json": item_flow_json,
             "revenue_flow_json": revenue_flow_json,
         },
     )
-
-def get_category_html(prefix_counts, prefix_rows):
-    category_rows = get_category_rows(sku_prefix_to_category_map, prefix_counts)
-
-    if category_rows:
-        category_html = "\n".join(category_rows)
-    else:
-        category_html = """
-            <tr>
-                <td colspan="2">
-                    No category data available.
-                </td>
-            </tr>
-        """
-
-    if prefix_rows:
-        prefix_html = "\n".join(prefix_rows)
-    else:
-        prefix_html = """
-            <tr>
-                <td colspan="2">
-                    No category data available.
-                </td>
-            </tr>
-        """
-        
-    return category_html
-
-def get_skus_html(sku_counts):
-    sku_rows = []
-
-    for sku, quantity in sorted(
-        sku_counts.items(),
-        key=lambda x: (-x[1], x[0])
-    ):
-        if quantity.is_integer():
-            quantity_display = str(int(quantity))
-        else:
-            quantity_display = str(quantity)
-
-        sku = escape(str(sku))
-        sku = fix_sku(sku)
-        sku_rows.append(
-            f"""
-            <tr>
-                <td>{sku}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )
-
-    if sku_rows:
-        sku_html = "\n".join(sku_rows)
-    else:
-        sku_html = """
-            <tr>
-                <td colspan="2">
-                    No SKU data available.
-                </td>
-            </tr>
-        """
-        
-    return sku_html
-
 
 @app.get("/debug/poynt-jwt")
 async def debug_poynt_jwt():

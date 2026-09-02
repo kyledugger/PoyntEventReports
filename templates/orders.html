@@ -426,7 +426,18 @@
                 </thead>
 
                 <tbody>
-                    {{sku_html | safe}}
+                    {% for row in sku_rows %}
+                        <tr>
+                            <td>{{row.sku}}</td>
+                            <td>{{row.quantity}}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="2">
+                                No SKU data available.
+                            </td>
+                        </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -443,7 +454,18 @@
                 </thead>
 
                 <tbody>
-                    {{category_html | safe}}
+                    {% for row in category_rows %}
+                        <tr>
+                            <td>{{row.category}}</td>
+                            <td>{{row.quantity}}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="2">
+                                No category data available.
+                            </td>
+                        </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -455,8 +477,110 @@
 
     <div class="orders-list">
         <h2>Orders:</h2>
-        {{orders_html | safe}}
-    <div>    
+
+        {% for order in orders_data %}
+
+            <section class="order">
+
+                <div class="order-header">
+
+                    <div>
+                        <strong>
+                            Order {{order.order_number}}
+                        </strong>
+                    </div>
+
+                    <div>
+                        <time
+                            class="local-time"
+                            datetime="{{order.created_at}}"
+                        >
+                            {{order.created_at}}
+                        </time>
+                    </div>
+
+                    <div>
+                        <strong>
+                            {{order.total_display}}
+                        </strong>
+                    </div>
+
+                </div>
+
+                {% if order.notes %}
+                    <div class="notes-container">
+                        <table>
+                            <tr>
+                                <td class="notes_header">
+                                    Notes
+                                </td>
+                                <td class="notes">
+                                    {{order.notes}}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                {% endif %}
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="product_name">
+                                Item Name
+                            </th>
+                            <th class="product_qty">
+                                Qty
+                            </th>
+                            <th class="product_sku">
+                                SKU
+                            </th>
+                            <th class="product_sku">
+                                Status
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in order["items"] %}
+                        
+                            <tr>
+                                <td class="product_name">
+                                    {{item.name}}
+                                </td>
+                                <td class="product_qty">
+                                    {{item.quantity}}
+                                </td>
+                                <td class="product_sku">
+                                    {{item.sku}}
+                                </td>
+                                <td class="product_sku">
+                                    {{item.status}}
+                                </td>
+                            </tr>
+
+                        {% else %}
+
+                            <tr>
+                                <td colspan="4">
+                                    No order items.
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+
+            </section>
+
+        {% else %}
+
+            <p>No orders were returned.</p>
+
+        {% endfor %}
+
+    </div>
 
     <p>
         <a href="/dashboard">
