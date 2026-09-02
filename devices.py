@@ -30,10 +30,7 @@ icc_terminal_types = {
 
 icc_stores = {
     "bddd89b0-c3cc-4135-befa-476c89fdf4f1"  : "Ice Cream Crush",
-    "6440e3cd-757f-4e2d-8076-d4895722f044," : "Ice Cream Crush Pop Up"
+    "6440e3cd-757f-4e2d-8076-d4895722f044" : "Ice Cream Crush Pop Up"
 }
-
-
-
 
 

@@ -1007,6 +1007,51 @@ def get_orders_date_range(start, end):
     }
 
 
+async def fetch_poynt_orders(
+    credentials,
+    user_id,
+    start_at,
+    end_at,
+    live,
+):
+    client = PoyntClient(
+        credentials,
+        user_id=user_id,
+    )
+
+    if live:
+        return await client.get_recent_orders(
+            100,
+            start_at=start_at,
+        )
+
+    return await client.get_recent_orders(
+        100,
+        start_at=start_at,
+        end_at=end_at,
+        fetch_all=True,
+    )
+
+
+def filter_completed_orders(orders):
+    completed_orders = []
+    cancelled_order_count = 0
+
+    for order in orders:
+        statuses = order.get("statuses") or {}
+
+        transaction_status = statuses.get(
+            "transactionStatusSummary"
+        )
+
+        if transaction_status == "COMPLETED":
+            completed_orders.append(order)
+        else:
+            cancelled_order_count += 1
+
+    return completed_orders, cancelled_order_count
+
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1045,23 +1090,13 @@ async def poynt_orders(
         )
 
     try:
-        client = PoyntClient(
+        orders = await fetch_poynt_orders(
             credentials,
-            user_id=user_id,
+            user_id,
+            start_at,
+            end_at,
+            live,
         )
-
-        if live:
-            orders = await client.get_recent_orders(
-                100,
-                start_at=start_at,
-            )
-        else:
-            orders = await client.get_recent_orders(
-                100,
-                start_at=start_at,
-                end_at=end_at,
-                fetch_all = True
-            )
 
     except PoyntReauthorizationRequired:
         return HTMLResponse(
@@ -1122,21 +1157,7 @@ async def poynt_orders(
     tip_ratio_display = '-'
 
 
-    completed_orders = []
-
-    cancelled_order_count = 0
-    for order in orders:
-
-        if "statuses" in order:
-            statuses = order.get("statuses") 
-            if "transactionStatusSummary" in statuses:
-                transaction_status = statuses.get("transactionStatusSummary")
-                if transaction_status == "COMPLETED":
-                    completed_orders.append(order)
-                else:
-                    cancelled_order_count += 1
-
-    orders = completed_orders                    
+    orders, cancelled_order_count = filter_completed_orders(orders)                
 
     for order in orders:
         amounts = order.get("amounts") or {}
@@ -1303,7 +1324,7 @@ async def poynt_orders(
 
     order_sections = []
 
-    stores = set()
+    store_ids = set()
 
     for order in orders:
         order_number = escape(
@@ -1318,11 +1339,11 @@ async def poynt_orders(
         order_num = order['orderNumber']
         if 'transactions' in order:
             transactions = order['transactions']
-            print(f"order # {order_num}: num transactions # {len(transactions)}")
             for transaction in transactions:
                 context = transaction['context']
                 storeId = context['storeId']
-                stores.add(storeId)
+                logger.debug("Adding Store %s to orders report:", storeId)
+                store_ids.add(storeId)
 
         created_at = escape(
             str(order.get("createdAt", ""))
@@ -1467,11 +1488,16 @@ async def poynt_orders(
 
     stores_display = ""
     first = True
-    for store in stores:
-        if first:
-            stores_display = icc_stores[store]
+    for store_id in store_ids:
+        logger.debug("Store id %s found", store_id)
+        if not first:
+            stores_display += " + "
+        if store_id.lower() not in icc_stores:
+            stores_display = f"Unknown Store {store_id}"
+            logger.warning("Unknown Store %s", store_id)
         else:
-            stores_display = " + " + icc_stores[store] 
+            stores_display = icc_stores[store_id.lower()]
+        first = False    
 
     if order_sections:
         orders_html = "\n".join(order_sections)
