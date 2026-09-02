@@ -405,3 +405,44 @@ class PoyntClient:
 
         return orders
     
+
+    async def get_stores(self) -> dict:
+        await self._refresh_if_needed()
+
+        logger.info(
+            "Poynt business request starting."
+        )
+
+        url = (
+            f"{self.BASE_URL}"
+            f"/businesses/{self.business_id}/stores"
+        )
+
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                url,
+                headers=self._headers(),
+            )
+
+        if not response.is_success:
+            logger.error(
+                "Poynt businesses request failed: HTTP %d",
+                response.status_code,
+            )            
+            raise PoyntAPIError(
+                f"Poynt API returned HTTP "
+                f"{response.status_code}"
+            )
+
+        logger.info(
+            "Poynt businesses request succeeded: HTTP %d",
+            response.status_code,
+        )  
+
+        print(response)
+
+
+        return response.json()
+    
+

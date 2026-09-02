@@ -1,5 +1,7 @@
 from zoneinfo import ZoneInfo
 from poynt.token import exchange_authorization_code
+from devices import icc_stores
+
 
 import os
 import secrets
@@ -497,6 +499,7 @@ def  get_prefix_counts(orders, sku_counts):   # Count units ordered by SKU prefi
 
         for item in items:
             sku = item.get("sku")
+
 
             if not sku:
                 continue
@@ -1119,9 +1122,25 @@ async def poynt_orders(
     tip_ratio_display = '-'
 
 
+    completed_orders = []
+
+    cancelled_order_count = 0
+    for order in orders:
+
+        if "statuses" in order:
+            statuses = order.get("statuses") 
+            if "transactionStatusSummary" in statuses:
+                transaction_status = statuses.get("transactionStatusSummary")
+                if transaction_status == "COMPLETED":
+                    completed_orders.append(order)
+                else:
+                    cancelled_order_count += 1
+
+    orders = completed_orders                    
+
     for order in orders:
         amounts = order.get("amounts") or {}
-
+       
         # Revenue
         total = amounts.get("netTotal")
 
@@ -1243,8 +1262,6 @@ async def poynt_orders(
                 f"{average_seconds_between_items:.1f}"
             )
 
-        format_duration    
-
         order_span_time_duration_display = format_duration(order_span_seconds)
 
         if len(order_times) > 1:
@@ -1280,62 +1297,13 @@ async def poynt_orders(
 
     prefix_rows = get_prefix_rows(prefix_counts)
 
-    category_rows = get_category_rows(sku_prefix_to_category_map, prefix_counts)
+    category_html = get_category_html(prefix_counts, prefix_rows)
 
-    if category_rows:
-        category_html = "\n".join(category_rows)
-    else:
-        category_html = """
-            <tr>
-                <td colspan="2">
-                    No category data available.
-                </td>
-            </tr>
-        """
+    sku_html = get_skus_html(sku_counts)
 
-    if prefix_rows:
-        prefix_html = "\n".join(prefix_rows)
-    else:
-        prefix_html = """
-            <tr>
-                <td colspan="2">
-                    No category data available.
-                </td>
-            </tr>
-        """
-    sku_rows = []
-
-    for sku, quantity in sorted(
-        sku_counts.items(),
-        key=lambda x: (-x[1], x[0])
-    ):
-        if quantity.is_integer():
-            quantity_display = str(int(quantity))
-        else:
-            quantity_display = str(quantity)
-
-        sku = escape(str(sku))
-        sku = fix_sku(sku)
-        sku_rows.append(
-            f"""
-            <tr>
-                <td>{sku}</td>
-                <td>{quantity_display}</td>
-            </tr>
-            """
-        )
-
-    if sku_rows:
-        sku_html = "\n".join(sku_rows)
-    else:
-        sku_html = """
-            <tr>
-                <td colspan="2">
-                    No SKU data available.
-                </td>
-            </tr>
-        """
     order_sections = []
+
+    stores = set()
 
     for order in orders:
         order_number = escape(
@@ -1347,6 +1315,15 @@ async def poynt_orders(
             )
         )
 
+        order_num = order['orderNumber']
+        if 'transactions' in order:
+            transactions = order['transactions']
+            print(f"order # {order_num}: num transactions # {len(transactions)}")
+            for transaction in transactions:
+                context = transaction['context']
+                storeId = context['storeId']
+                stores.add(storeId)
+
         created_at = escape(
             str(order.get("createdAt", ""))
         )
@@ -1356,7 +1333,7 @@ async def poynt_orders(
         statuses = order.get("statuses") or {}
 
         status = (
-            statuses.get("status")
+            statuses.get("transactionStatusSummary")
             if isinstance(statuses, dict)
             else None
         )
@@ -1430,6 +1407,7 @@ async def poynt_orders(
                     <td class="product_name">{name}</td>
                     <td class="product_qty">{quantity}</td>
                     <td class="product_sku">{sku}</td>
+                    <td class="product_sku">{status_display}</td>
                   </tr>
                 """
             )
@@ -1474,6 +1452,8 @@ async def poynt_orders(
                             <th class="product_name">Item Name</th>
                             <th class="product_qty">Qty</th>
                             <th class="product_sku">SKU</th>
+                            <th class="product_sku">Status</th>
+                            
                         </tr>
                     </thead>
 
@@ -1484,6 +1464,14 @@ async def poynt_orders(
             </section>
             """
         )
+
+    stores_display = ""
+    first = True
+    for store in stores:
+        if first:
+            stores_display = icc_stores[store]
+        else:
+            stores_display = " + " + icc_stores[store] 
 
     if order_sections:
         orders_html = "\n".join(order_sections)
@@ -1725,8 +1713,9 @@ async def poynt_orders(
 
                 .orders-list {{
                     margin-top: 20px;
-                }}               
-                               
+                }}       
+                    
+                              
             </style>
         </head>
 
@@ -1823,6 +1812,11 @@ async def poynt_orders(
                     <strong>{summary_text}</strong>
                 </div>
                 <div class="dashboard-tidbit">
+                    Cancelled Orders:
+                    <strong>{cancelled_order_count}</strong>
+                </div>
+                
+                <div class="dashboard-tidbit">
                     Revenue:
                     <strong>{total_revenue_display}</strong>
                 </div>
@@ -1871,6 +1865,15 @@ async def poynt_orders(
                     <strong>{fastest_3_item_display} sec</strong>
                 </div>
             </div>
+
+            <div class="clearfix"></div>
+
+            <div>
+                <h2>Stores:</h2>    
+                <div>
+                    {stores_display}
+                </div>
+            <div>    
 
             <div class="clearfix"></div>
 
@@ -2318,6 +2321,69 @@ async def poynt_orders(
         """
     )
 
+def get_category_html(prefix_counts, prefix_rows):
+    category_rows = get_category_rows(sku_prefix_to_category_map, prefix_counts)
+
+    if category_rows:
+        category_html = "\n".join(category_rows)
+    else:
+        category_html = """
+            <tr>
+                <td colspan="2">
+                    No category data available.
+                </td>
+            </tr>
+        """
+
+    if prefix_rows:
+        prefix_html = "\n".join(prefix_rows)
+    else:
+        prefix_html = """
+            <tr>
+                <td colspan="2">
+                    No category data available.
+                </td>
+            </tr>
+        """
+        
+    return category_html
+
+def get_skus_html(sku_counts):
+    sku_rows = []
+
+    for sku, quantity in sorted(
+        sku_counts.items(),
+        key=lambda x: (-x[1], x[0])
+    ):
+        if quantity.is_integer():
+            quantity_display = str(int(quantity))
+        else:
+            quantity_display = str(quantity)
+
+        sku = escape(str(sku))
+        sku = fix_sku(sku)
+        sku_rows.append(
+            f"""
+            <tr>
+                <td>{sku}</td>
+                <td>{quantity_display}</td>
+            </tr>
+            """
+        )
+
+    if sku_rows:
+        sku_html = "\n".join(sku_rows)
+    else:
+        sku_html = """
+            <tr>
+                <td colspan="2">
+                    No SKU data available.
+                </td>
+            </tr>
+        """
+        
+    return sku_html
+
 
 @app.get("/debug/poynt-jwt")
 async def debug_poynt_jwt():
@@ -2336,3 +2402,91 @@ async def health():
     return {
         "status": "healthy"
     }
+
+@app.get("/poynt/stores", response_class=HTMLResponse)
+async def poynt_stores(
+    request: Request,
+    start: str = "",
+    end: str = "",
+):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    credentials = get_poynt_credentials(user_id)
+
+    if not credentials:
+        return HTMLResponse(
+            """
+            <h1>Poynt Error</h1>
+            <p>No Poynt connection was found.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=404
+        )
+
+    try:
+        client = PoyntClient(
+            credentials,
+            user_id=user_id,
+        )
+
+        businesses = await client.get_stores()
+
+    except PoyntReauthorizationRequired:
+        return HTMLResponse(
+            """
+            <h1>Poynt Authorization Required</h1>
+            <p>
+                Your Poynt authorization has expired.
+                Please reconnect your Poynt account.
+            </p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=401,
+        )
+
+    except Exception as e:
+        print(
+            f"Poynt stores request failed: "
+            f"{type(e).__name__}: {e}",
+            flush=True
+        )
+
+        return HTMLResponse(
+            """
+            <h1>Poynt stores Error</h1>
+            <p>The stores request failed.</p>
+            <p>Check the application logs.</p>
+            <p>
+                <a href="/dashboard">Return to Dashboard</a>
+            </p>
+            """,
+            status_code=502
+        )
+
+    return HTMLResponse(
+        f"""
+        <h1>Poynt Stores Success!</h1>
+        <p>Stores request succeeded.</p>
+        <p>
+            The Poynt access token was retrieved from the
+            database and used to make this request.
+        </p>
+        <p>
+        {businesses}
+        </p>
+        <p>
+            <a href="/dashboard">Return to Dashboard</a>
+        </p>
+        """
+    )
+    
