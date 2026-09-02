@@ -1052,6 +1052,115 @@ def filter_completed_orders(orders):
     return completed_orders, cancelled_order_count
 
 
+def calculate_order_metrics(orders):
+    """
+    Calculate the core metrics for a collection of completed orders.
+
+    Returns raw numeric values and datetime objects.
+    Formatting for display happens elsewhere.
+    """
+
+    total_revenue = 0.0
+    total_items = 0.0
+    total_tips = 0.0
+    order_times = []
+
+    for order in orders:
+        amounts = order.get("amounts") or {}
+
+        # Revenue
+        total = amounts.get("netTotal")
+
+        if total is None:
+            total = amounts.get("orderAmount")
+
+        try:
+            total_revenue += float(total) / 100
+        except (TypeError, ValueError):
+            pass
+
+        # Tips
+        captured_totals = amounts.get("capturedTotals")
+
+        if captured_totals:
+            tip = captured_totals.get("tipAmount")
+        else:
+            tip = 0
+
+        try:
+            total_tips += float(tip) / 100
+        except (TypeError, ValueError):
+            pass
+
+        # Items
+        for item in order.get("items") or []:
+            quantity = item.get("quantity", 0)
+
+            try:
+                total_items += float(quantity)
+            except (TypeError, ValueError):
+                pass
+
+        # Order timestamp
+        created_at = order.get("createdAt")
+
+        if created_at:
+            try:
+                order_time = datetime.fromisoformat(
+                    created_at.replace("Z", "+00:00")
+                )
+                order_times.append(order_time)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "missing created at for order: %s",
+                    order
+                )
+
+    oldest_order_at = None
+    newest_order_at = None
+    order_span_seconds = None
+    average_seconds_between_orders = None
+    average_seconds_between_items = None
+    items_per_order = None
+    tip_ratio = None
+
+    if order_times:
+        oldest_order_at = min(order_times)
+        newest_order_at = max(order_times)
+
+        order_span_seconds = (
+            newest_order_at - oldest_order_at
+        ).total_seconds()
+
+        if len(order_times) > 1:
+            average_seconds_between_orders = (
+                order_span_seconds / (len(order_times) - 1)
+            )
+
+        if total_items > 1:
+            average_seconds_between_items = (
+                order_span_seconds / (total_items - 1)
+            )
+
+    if orders:
+        items_per_order = total_items / len(orders)
+
+    if total_revenue:
+        tip_ratio = total_tips / total_revenue
+
+    return {
+        "total_revenue": total_revenue,
+        "total_items": total_items,
+        "total_tips": total_tips,
+        "oldest_order_at": oldest_order_at,
+        "newest_order_at": newest_order_at,
+        "order_span_seconds": order_span_seconds,
+        "average_seconds_between_orders": average_seconds_between_orders,
+        "average_seconds_between_items": average_seconds_between_items,
+        "items_per_order": items_per_order,
+        "tip_ratio": tip_ratio,
+    }
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1140,72 +1249,27 @@ async def poynt_orders(
         reverse=True,
     )
 
-    # Determine the time span represented by the orders.
-    oldest_order_at = None
-    newest_order_at = None
-    order_span_time_duration_display = None
-    average_seconds_display = "-"    
-
-    order_times = []
-
-    total_revenue = 0.0
-    total_items = 0.0
-    total_tips = 0.0
-    average_seconds_between_items = None
-    average_seconds_between_items_display = "-"    
-    items_per_order_display = "-"
-    tip_ratio_display = '-'
-
-
     orders, cancelled_order_count = filter_completed_orders(orders)                
 
-    for order in orders:
-        amounts = order.get("amounts") or {}
-       
-        # Revenue
-        total = amounts.get("netTotal")
+    metrics = calculate_order_metrics(orders)
 
-        if total is None:
-            total = amounts.get("orderAmount")
+    total_revenue = metrics["total_revenue"]
+    total_items = metrics["total_items"]
+    total_tips = metrics["total_tips"]
 
-        try:
-            total_revenue += float(total) / 100
-        except (TypeError, ValueError):
-            pass
+    oldest_order_at = metrics["oldest_order_at"]
+    newest_order_at = metrics["newest_order_at"]
 
-        # Tips
-        capturedTotals = amounts.get("capturedTotals")   
-        if capturedTotals:    
-            tip = capturedTotals.get("tipAmount")
-        else:
-            tip = 0    
+    order_span_seconds = metrics["order_span_seconds"]
+    average_seconds_between_orders = metrics[
+        "average_seconds_between_orders"
+    ]
+    average_seconds_between_items = metrics[
+        "average_seconds_between_items"
+    ]
 
-        try:
-            total_tips += (float(tip) / 100)
-        except (TypeError, ValueError):
-            pass
-
-        # Items
-        for item in order.get("items") or []:
-            quantity = item.get("quantity", 0)
-
-            try:
-                total_items += float(quantity)
-            except (TypeError, ValueError):
-                pass
-
-        # Order timestamp
-        created_at = order.get("createdAt")
-
-        if created_at:
-            try:
-                order_time = datetime.fromisoformat(
-                    created_at.replace("Z", "+00:00")
-                )
-                order_times.append(order_time)
-            except (TypeError, ValueError):
-                logger.warning("missing created at for order: %s", order)
-                pass
+    items_per_order = metrics["items_per_order"]
+    tip_ratio = metrics["tip_ratio"]
 
     order_intervals = get_order_intervals(orders)
     chart_data_json = json.dumps(order_intervals)
@@ -1222,20 +1286,19 @@ async def poynt_orders(
         total_items_display = str(int(total_items))
     else:
         total_items_display = str(total_items)
-
-    items_per_order = "-"
-    if len(orders):
-        items_per_order = float(total_items) / len(orders)
-
-    tip_ratio = "-"
-    if total_revenue:
-        tip_ratio = float(total_tips) / total_revenue 
+    # END Insert
 
     if isinstance(items_per_order, float):
         items_per_order_display = f"{items_per_order:,.2f}"
+    else:
+        logger.debug("items_per_order %s isn't a float", items_per_order)    
+        items_per_order_display = "-"
 
     if isinstance(tip_ratio, float):    
         tip_ratio_display = f"{tip_ratio:,.1%}"
+    else:
+        logger.debug("tips_raio %s isn't a float", tip_ratio)    
+        tip_ratio_display = "-"        
 
     total_revenue_display = f"${total_revenue:,.2f}"
     total_tips_display = f"${total_tips:,.2f}"
@@ -1266,39 +1329,26 @@ async def poynt_orders(
     if not len(orders):
         chart_display_flag = "display: none;"    
 
-    if order_times:
-        oldest_order_at = min(order_times)
-        newest_order_at = max(order_times)
+    if order_span_seconds is not None:
+        order_span_time_duration_display = format_duration(
+            order_span_seconds
+        )
+    else:
+        order_span_time_duration_display = "-"
 
-        order_span_seconds = (
-            newest_order_at - oldest_order_at
-        ).total_seconds() 
+    if average_seconds_between_items is not None:
+        average_seconds_between_items_display = (
+            f"{average_seconds_between_items:.1f}"
+        )
+    else:
+        average_seconds_between_items_display = "-"
 
-        if total_items > 1:
-            average_seconds_between_items = (
-                order_span_seconds / (total_items - 1)
-            )
-
-            average_seconds_between_items_display = (
-                f"{average_seconds_between_items:.1f}"
-            )
-
-        order_span_time_duration_display = format_duration(order_span_seconds)
-
-        if len(order_times) > 1:
-            average_seconds_between_orders = (
-                order_span_seconds / (len(order_times) - 1)
-            )
-        else:
-            average_seconds_between_orders = None        
-
-        if average_seconds_between_orders is not None:
-            average_seconds_display = (
-                f"{average_seconds_between_orders:.1f}"
-            )
-        else:
-            average_seconds_display = "-"
-
+    if average_seconds_between_orders is not None:
+        average_seconds_display = (
+            f"{average_seconds_between_orders:.1f}"
+        )
+    else:
+        average_seconds_display = "-"    
 
     if oldest_order_at and newest_order_at:
         oldest_order_iso = oldest_order_at.isoformat()
@@ -1336,13 +1386,17 @@ async def poynt_orders(
             )
         )
 
-        order_num = order['orderNumber']
+        if 'orderNumber' in order:
+            order_num = order['orderNumber']
+        else: 
+            logger.warning("missing orderNuimber from order {%s}", order)    
+            order_num = 0
         if 'transactions' in order:
             transactions = order['transactions']
             for transaction in transactions:
                 context = transaction['context']
                 storeId = context['storeId']
-                logger.debug("Adding Store %s to orders report:", storeId)
+                #logger.debug("Adding Store %s to orders report:", storeId)
                 store_ids.add(storeId)
 
         created_at = escape(
