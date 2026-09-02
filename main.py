@@ -1161,6 +1161,208 @@ def calculate_order_metrics(orders):
         "tip_ratio": tip_ratio,
     }
 
+def prepare_chart_data(orders):
+    """
+    Prepare chart data for the orders report.
+
+    Returns raw chart data and JSON strings for use by JavaScript.
+    """
+
+    order_intervals = get_order_intervals(orders)
+    item_flow = get_item_flow(orders)
+    revenue_flow = get_revenue_flow(orders)
+
+    return {
+        "order_intervals": order_intervals,
+        "order_intervals_json": json.dumps(order_intervals),
+        "item_flow": item_flow,
+        "item_flow_json": json.dumps(item_flow),
+        "revenue_flow": revenue_flow,
+        "revenue_flow_json": json.dumps(revenue_flow),
+    }
+
+
+def get_orders_html(orders):
+    """
+    Generate the HTML for the displayed orders.
+
+    Returns:
+        orders_html: HTML string containing all order sections
+        store_ids: set of store IDs found in the orders
+    """
+
+    order_sections = []
+    store_ids = set()
+
+    for order in orders:
+        order_number = escape(
+            str(
+                order.get(
+                    "orderNumber",
+                    order.get("id", "Unknown")
+                )
+            )
+        )
+
+        if "transactions" in order:
+            transactions = order["transactions"]
+
+            for transaction in transactions:
+                context = transaction["context"]
+                store_id = context["storeId"]
+                store_ids.add(store_id)
+
+        created_at = escape(
+            str(order.get("createdAt", ""))
+        )
+
+        # Poynt's statuses object is documented as OrderStatuses.
+        # We don't assume a single exact structure here.
+        statuses = order.get("statuses") or {}
+
+        status = (
+            statuses.get("transactionStatusSummary")
+            if isinstance(statuses, dict)
+            else None
+        )
+
+        status_display = escape(
+            str(status or "Unknown")
+        )
+
+        amounts = order.get("amounts") or {}
+
+        total = amounts.get("netTotal")
+
+        if total is None:
+            total = amounts.get("orderAmount")
+
+        currency = amounts.get(
+            "currency",
+            "USD"
+        )
+
+        if total is not None:
+            try:
+                total_display = (
+                    f"{escape(str(currency))} "
+                    f"${int(total) / 100:.2f}"
+                )
+            except (TypeError, ValueError):
+                total_display = escape(str(total))
+        else:
+            total_display = "Unknown"
+
+        order_notes = escape(
+            str(order.get("notes") or "")
+        )
+
+        order_notes_HTML = ""
+
+        if order_notes:
+            order_notes_HTML = (
+                f"""<div class="notes-container"><table>"""
+                f"""<tr><td class="notes_header">Notes</td>"""
+                f"""<td class="notes">{order_notes}</td></tr>"""
+                f"""</table></div>"""
+            )
+
+        items = order.get("items") or []
+
+        item_rows = []
+
+        for item in items:
+            name = escape(
+                str(item.get("name") or "")
+            )
+
+            quantity = escape(
+                str(item.get("quantity") or "")
+            )
+
+            sku = escape(
+                str(item.get("sku") or "")
+            )
+
+            sku = fix_sku(sku)
+
+            item_status = escape(
+                str(item.get("status") or "")
+            )
+
+            item_rows.append(
+                f"""
+                <tr>
+                    <td class="product_name">{name}</td>
+                    <td class="product_qty">{quantity}</td>
+                    <td class="product_sku">{sku}</td>
+                    <td class="product_sku">{item_status}</td>
+                </tr>
+                """
+            )
+
+        if item_rows:
+            items_html = "\n".join(item_rows)
+        else:
+            items_html = """
+                <tr>
+                    <td colspan="4">
+                        No order items.
+                    </td>
+                </tr>
+            """
+
+        order_sections.append(
+            f"""
+            <section class="order">
+                <div class="order-header">
+                    <div>
+                        <strong>Order {order_number}</strong>
+                    </div>
+
+                    <div>
+                        <time
+                            class="local-time"
+                            datetime="{created_at}"
+                        >
+                            {created_at}
+                        </time>
+                    </div>
+
+                    <div>
+                        <strong>{total_display}</strong>
+                    </div>
+                </div>
+
+                {order_notes_HTML}
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="product_name">Item Name</th>
+                            <th class="product_qty">Qty</th>
+                            <th class="product_sku">SKU</th>
+                            <th class="product_sku">Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+            </section>
+            """
+        )
+
+    if order_sections:
+        orders_html = "\n".join(order_sections)
+    else:
+        orders_html = """
+            <p>No orders were returned.</p>
+        """
+
+    return orders_html, store_ids
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1271,16 +1473,13 @@ async def poynt_orders(
     items_per_order = metrics["items_per_order"]
     tip_ratio = metrics["tip_ratio"]
 
-    order_intervals = get_order_intervals(orders)
-    chart_data_json = json.dumps(order_intervals)
+    chart_data = prepare_chart_data(orders)
+
+    chart_data_json = chart_data["order_intervals_json"]
+    item_flow_json = chart_data["item_flow_json"]
+    revenue_flow_json = chart_data["revenue_flow_json"]
 
     fastest_processing = get_fastest_processing_times(orders)
-
-    item_flow = get_item_flow(orders)
-    item_flow_json = json.dumps(item_flow)    
-
-    revenue_flow = get_revenue_flow(orders)
-    revenue_flow_json = json.dumps(revenue_flow)    
 
     if total_items.is_integer():
         total_items_display = str(int(total_items))
@@ -1297,7 +1496,7 @@ async def poynt_orders(
     if isinstance(tip_ratio, float):    
         tip_ratio_display = f"{tip_ratio:,.1%}"
     else:
-        logger.debug("tips_raio %s isn't a float", tip_ratio)    
+        logger.debug(" %s isn't a float", tip_ratio)    
         tip_ratio_display = "-"        
 
     total_revenue_display = f"${total_revenue:,.2f}"
@@ -1372,178 +1571,13 @@ async def poynt_orders(
 
     sku_html = get_skus_html(sku_counts)
 
-    order_sections = []
+    orders_html, store_ids = get_orders_html(orders)
 
     store_ids = set()
-
-    for order in orders:
-        order_number = escape(
-            str(
-                order.get(
-                    "orderNumber",
-                    order.get("id", "Unknown")
-                )
-            )
-        )
-
-        if 'orderNumber' in order:
-            order_num = order['orderNumber']
-        else: 
-            logger.warning("missing orderNuimber from order {%s}", order)    
-            order_num = 0
-        if 'transactions' in order:
-            transactions = order['transactions']
-            for transaction in transactions:
-                context = transaction['context']
-                storeId = context['storeId']
-                #logger.debug("Adding Store %s to orders report:", storeId)
-                store_ids.add(storeId)
-
-        created_at = escape(
-            str(order.get("createdAt", ""))
-        )
-
-        # Poynt's statuses object is documented as OrderStatuses.
-        # We don't assume a single exact structure here.
-        statuses = order.get("statuses") or {}
-
-        status = (
-            statuses.get("transactionStatusSummary")
-            if isinstance(statuses, dict)
-            else None
-        )
-
-        status_display = escape(
-            str(status or "Unknown")
-        )
-
-        amounts = order.get("amounts") or {}
-
-        total = amounts.get("netTotal")
-
-        if total is None:
-            total = amounts.get("orderAmount")
-
-        currency = amounts.get(
-            "currency",
-            "USD"
-        )
-
-        if total is not None:
-            try:
-                total_display = (
-                    f"{escape(str(currency))} "
-                    f"${int(total) / 100:.2f}"
-                )
-            except (TypeError, ValueError):
-                total_display = escape(str(total))
-        else:
-            total_display = "Unknown"
-
-        order_notes = escape(
-                str(order.get("notes") or "")
-            )
-
-        order_notes_HTML = ""    
-
-        if order_notes:
-            order_notes_HTML = f"""<div class="notes-container"><table><tr><td class="notes_header">Notes</td><td class="notes">{order_notes}</td></tr></table></div>"""
-
-        items = order.get("items") or []
-
-        item_rows = []
-
-        for item in items:
-            name = escape(
-                str(item.get("name") or "")
-            )
-
-            quantity = escape(
-                str(item.get("quantity") or "")
-            )
-
-            details = escape(
-                str(item.get("details") or "")
-            )
-
-
-            sku = escape(
-                str(item.get("sku") or "")
-            )
-            sku = fix_sku(sku)
-
-            status = escape(
-                str(item.get("status") or "")
-            )
-
-            item_rows.append(
-                f"""
-                <tr>
-                    <td class="product_name">{name}</td>
-                    <td class="product_qty">{quantity}</td>
-                    <td class="product_sku">{sku}</td>
-                    <td class="product_sku">{status_display}</td>
-                  </tr>
-                """
-            )
-
-        if item_rows:
-            items_html = "\n".join(item_rows)
-        else:
-            items_html = """
-                <tr>
-                    <td colspan="4">
-                        No order items.
-                    </td>
-                </tr>
-            """
-
-        order_sections.append(
-            f"""
-            <section class="order">
-                <div class="order-header">
-                    <div>
-                        <strong>Order {order_number}</strong>
-                    </div>
-
-                    <div>
-                        <time
-                            class="local-time"
-                            datetime="{created_at}"
-                        
-                            {created_at}
-                        </time>
-                    </div>
-
-                    <div>
-                        <strong>{total_display}</strong>
-                    </div>
-                </div>
-                {order_notes_HTML}
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="product_name">Item Name</th>
-                            <th class="product_qty">Qty</th>
-                            <th class="product_sku">SKU</th>
-                            <th class="product_sku">Status</th>
-                            
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {items_html}
-                    </tbody>
-                </table>
-            </section>
-            """
-        )
 
     stores_display = ""
     first = True
     for store_id in store_ids:
-        logger.debug("Store id %s found", store_id)
         if not first:
             stores_display += " + "
         if store_id.lower() not in icc_stores:
@@ -1551,14 +1585,7 @@ async def poynt_orders(
             logger.warning("Unknown Store %s", store_id)
         else:
             stores_display = icc_stores[store_id.lower()]
-        first = False    
-
-    if order_sections:
-        orders_html = "\n".join(order_sections)
-    else:
-        orders_html = """
-            <p>No orders were returned.</p>
-        """
+        first = False
 
     return HTMLResponse(
         f"""
