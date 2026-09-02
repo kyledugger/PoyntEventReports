@@ -1363,6 +1363,33 @@ def get_orders_html(orders):
 
     return orders_html, store_ids
 
+def get_stores_display(store_ids):
+    """
+    Convert a set of store IDs into display text.
+
+    Returns a human-readable string containing the
+    names of all stores found in the orders.
+    """
+
+    stores_display = ""
+    first = True
+
+    for store_id in store_ids:
+        logger.debug("Store id %s found", store_id)
+
+        if not first:
+            stores_display += " + "
+
+        if store_id.lower() not in icc_stores:
+            stores_display = f"Unknown Store {store_id}"
+            logger.warning("Unknown Store %s", store_id)
+        else:
+            stores_display += icc_stores[store_id.lower()]
+
+        first = False
+
+    return stores_display
+
 @app.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1573,19 +1600,7 @@ async def poynt_orders(
 
     orders_html, store_ids = get_orders_html(orders)
 
-    store_ids = set()
-
-    stores_display = ""
-    first = True
-    for store_id in store_ids:
-        if not first:
-            stores_display += " + "
-        if store_id.lower() not in icc_stores:
-            stores_display = f"Unknown Store {store_id}"
-            logger.warning("Unknown Store %s", store_id)
-        else:
-            stores_display = icc_stores[store_id.lower()]
-        first = False
+    stores_display = get_stores_display(store_ids)
 
     return HTMLResponse(
         f"""
