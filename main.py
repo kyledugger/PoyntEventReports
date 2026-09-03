@@ -7,15 +7,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
 from models import User
 from poynt.connection import (
-    get_poynt_connection,
-    get_poynt_credentials,
-    save_poynt_connection,
+    get_poynt_connection
 )
 
-from poynt.client import (
-    PoyntClient,
-    PoyntReauthorizationRequired,
-)
 from routers.auth_routes import router as auth_router
 from routers.oauth import router as oauth_router
 from routers.poynt import router as poynt_router
@@ -50,7 +44,6 @@ else:
 
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
-
 
 app = FastAPI(title="Codelian Poynt")
 app.include_router(auth_router)
