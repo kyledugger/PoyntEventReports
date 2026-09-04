@@ -1,7 +1,7 @@
 from sku_map import fix_sku
 from categories import sku_prefix_to_category_map
 import json
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
@@ -412,6 +412,42 @@ def get_item_flow(orders):
 
     return result
 
+def filter_orders_by_stores(orders, stores):
+    """
+    Filter orders to those associated with the requested stores.
+
+    If stores is None or empty, return all orders.
+    """
+
+    logger.info("filtering stores to: %s", stores)
+
+    if not stores:
+        return orders
+
+    requested_stores = {
+        store.lower()
+        for store in stores
+        if store
+    }
+
+    filtered_orders = []
+
+    for order in orders:
+        context = order.get("context") or {}
+        store_id = context.get("storeId")
+
+        if store_id and store_id.lower() in requested_stores:
+            filtered_orders.append(order)
+
+    logger.info(
+        "store filtering reduced %s orders to %s orders",
+        len(orders),
+        len(filtered_orders),
+    )
+
+    return filtered_orders
+
+
 def get_revenue_flow(orders):
     chronological_orders = list(reversed(orders))
 
@@ -796,14 +832,11 @@ def get_orders_data(orders):
             )
         )
 
-        transactions = order.get("transactions") or []
+        context = order.get("context") or {}
+        store_id = context.get("storeId")
 
-        for transaction in transactions:
-            context = transaction.get("context") or {}
-            store_id = context.get("storeId")
-
-            if store_id:
-                store_ids.add(store_id)
+        if store_id:
+            store_ids.add(store_id)
 
         created_at = str(
             order.get("createdAt", "")
@@ -909,8 +942,11 @@ async def poynt_orders(
     request: Request,
     start: str = "",
     end: str = "",
+    stores: list[str] | None = Query(default=None),
 ):
     user_id = request.session.get("user_id")
+    logger.info("filtering stores to: %s", stores)
+
 
     if not user_id:
         return RedirectResponse(
@@ -982,6 +1018,10 @@ async def poynt_orders(
             start_at,
             end_at,
         )
+        orders = filter_orders_by_stores(
+            orders,
+            stores,
+        )        
 
     except PoyntReauthorizationRequired:
         return templates.TemplateResponse(
