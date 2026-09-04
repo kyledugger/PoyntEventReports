@@ -182,6 +182,26 @@
             cursor: pointer;
         }
 
+        .store-selector {
+            display: inline-block;
+            margin: 0 10px;
+            vertical-align: top;
+        }
+
+        .store-selector-title {
+            margin-bottom: 5px;
+        }
+
+        .store-selector label {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .store-options {
+            margin-top: 5px;
+            padding-left: 10px;
+        }
+
         .orders-loading {
             display: none;
             margin: 30px 0;
@@ -297,6 +317,38 @@
                 <button type="button" onclick="setToday()">
                     Today
                 </button>
+
+                {% if available_stores %}
+                    <div class="store-selector">
+                        <div class="store-selector-title">
+                            <strong>Stores</strong>
+                        </div>
+
+                        <label>
+                            <input
+                                type="checkbox"
+                                id="all-stores"
+                                {% if selected_stores|length == available_stores|length %}checked{% endif %}
+                            >
+                            All Stores
+                        </label>
+
+                        <div class="store-options">
+                            {% for store in available_stores %}
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        name="stores"
+                                        value="{{store.id}}"
+                                        class="store-checkbox"
+                                        {% if store.id in selected_stores %}checked{% endif %}
+                                    >
+                                    {{store.name}}
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
 
                 <button type="submit">
                     Generate
@@ -998,6 +1050,29 @@
                 generateButton.disabled = true;
                 generateButton.textContent = "Generating...";
             }
+        }
+
+        const allStoresCheckbox = document.getElementById("all-stores");
+        const storeCheckboxes = document.querySelectorAll(".store-checkbox");
+
+        function updateStoreCheckboxes() {
+            if (!allStoresCheckbox) {
+                return;
+            }
+
+            storeCheckboxes.forEach(function(checkbox) {
+                if (allStoresCheckbox.checked) {
+                    checkbox.checked = true;
+                    checkbox.disabled = true;
+                } else {
+                    checkbox.disabled = false;
+                }
+            });
+        }
+
+        if (allStoresCheckbox) {
+            allStoresCheckbox.addEventListener("change", updateStoreCheckboxes);
+            updateStoreCheckboxes();
         }
 
         if (ordersForm) {

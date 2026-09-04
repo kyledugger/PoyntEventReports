@@ -412,6 +412,29 @@ def get_item_flow(orders):
 
     return result
 
+def get_available_store_ids(orders):
+    """
+    Get the store IDs found in the original order collection.
+    """
+
+    store_ids = set()
+
+    for order in orders:
+        context = order.get("context") or {}
+        store_id = context.get("storeId")
+
+        if store_id:
+            store_ids.add(store_id.lower())
+
+    return sorted(
+        store_ids,
+        key=lambda store_id: icc_stores.get(
+            store_id,
+            f"Unknown Store {store_id}",
+        ).lower(),
+    )
+
+
 def filter_orders_by_stores(orders, stores):
     """
     Filter orders to those associated with the requested stores.
@@ -430,6 +453,9 @@ def filter_orders_by_stores(orders, stores):
         if store
     }
 
+    if not requested_stores:
+        return orders
+
     filtered_orders = []
 
     for order in orders:
@@ -446,7 +472,6 @@ def filter_orders_by_stores(orders, stores):
     )
 
     return filtered_orders
-
 
 def get_revenue_flow(orders):
     chronological_orders = list(reversed(orders))
@@ -832,11 +857,14 @@ def get_orders_data(orders):
             )
         )
 
-        context = order.get("context") or {}
-        store_id = context.get("storeId")
+        transactions = order.get("transactions") or []
 
-        if store_id:
-            store_ids.add(store_id)
+        for transaction in transactions:
+            context = transaction.get("context") or {}
+            store_id = context.get("storeId")
+
+            if store_id:
+                store_ids.add(store_id)
 
         created_at = str(
             order.get("createdAt", "")
@@ -942,7 +970,7 @@ async def poynt_orders(
     request: Request,
     start: str = "",
     end: str = "",
-    stores: list[str] | None = Query(default=None),
+    stores: list[str] | None = Query(default=None),    
 ):
     user_id = request.session.get("user_id")
     logger.info("filtering stores to: %s", stores)
@@ -1018,10 +1046,48 @@ async def poynt_orders(
             start_at,
             end_at,
         )
+
+        available_store_ids = get_available_store_ids(orders)
+
+        if not available_store_ids:
+            return templates.TemplateResponse(
+                request=request,
+                name="orders.html",
+                context={
+                    "report_generated": False,
+                    "validation_title": "No Store Data",
+                    "validation_message": "No store information was found in the orders for this date range.",
+                    "start_input_value": start,
+                    "end_input_value": end,
+                    "available_stores": [],
+                    "selected_stores": [],
+                    "chart_data_json": "[]",
+                    "item_flow_json": "[]",
+                    "revenue_flow_json": "[]",
+                },
+            )
+
+        available_store_set = set(available_store_ids)
+
+        if stores:
+            requested_stores = {
+                store.lower()
+                for store in stores
+                if store
+            }
+            selected_store_ids = sorted(
+                requested_stores & available_store_set
+            )
+
+            if not selected_store_ids:
+                selected_store_ids = available_store_ids
+        else:
+            selected_store_ids = available_store_ids
+
         orders = filter_orders_by_stores(
             orders,
-            stores,
-        )        
+            selected_store_ids if stores else None,
+        )
 
     except PoyntReauthorizationRequired:
         return templates.TemplateResponse(
@@ -1191,6 +1257,17 @@ async def poynt_orders(
 
     stores_display = get_stores_display(store_ids)
 
+    available_stores = [
+        {
+            "id": store_id,
+            "name": icc_stores.get(
+                store_id,
+                f"Unknown Store {store_id}",
+            ),
+        }
+        for store_id in available_store_ids
+    ]
+
     return templates.TemplateResponse(
         request=request,
         name="orders.html",
@@ -1215,6 +1292,8 @@ async def poynt_orders(
             "start_input_value": start_input_value,
             "end_input_value": end_input_value,
             "stores_display": stores_display,
+            "available_stores": available_stores,
+            "selected_stores": selected_store_ids,
             "sku_rows": sku_rows,
             "category_rows": category_rows,
             "orders_data": orders_data,
