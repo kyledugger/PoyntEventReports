@@ -977,28 +977,36 @@
         const ordersReport = document.querySelector("[data-orders-report]");
         const validationMessage = document.querySelector(".validation-message");
 
-        if (ordersForm) {
-            ordersForm.addEventListener("submit", function() {
-                if (ordersReport) {
-                    ordersReport.style.display = "none";
-                }
+        function showOrdersLoading() {
+            if (ordersReport) {
+                ordersReport.style.display = "none";
+            }
 
-                if (validationMessage) {
-                    validationMessage.style.display = "none";
-                }
+            if (validationMessage) {
+                validationMessage.style.display = "none";
+            }
 
-                if (ordersLoading) {
-                    ordersLoading.style.display = "block";
-                }
+            if (ordersLoading) {
+                ordersLoading.style.display = "block";
+            }
 
-                const generateButton = ordersForm.querySelector("button[type=\"submit\"]");
+            const generateButton = ordersForm && ordersForm.querySelector(
+                "button[type=\"submit\"]"
+            );
 
-                if (generateButton) {
-                    generateButton.disabled = true;
-                    generateButton.textContent = "Generating...";
-                }
-            });
+            if (generateButton) {
+                generateButton.disabled = true;
+                generateButton.textContent = "Generating...";
+            }
         }
+
+        if (ordersForm) {
+            ordersForm.addEventListener("submit", showOrdersLoading);
+        }
+
+        window.addEventListener("beforeunload", function() {
+            showOrdersLoading();
+        });
 
         function setToday() {
             const now = new Date();
