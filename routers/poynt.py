@@ -548,84 +548,62 @@ def validate_and_convert_iso_datetime(iso_string: str):
 
 
 def get_orders_date_range(start, end):
-
     start_at_date = validate_and_convert_iso_datetime(start)
     end_at_date = validate_and_convert_iso_datetime(end)
 
     arizona_tz = ZoneInfo("America/Phoenix")
 
     if start_at_date and start_at_date.tzinfo is None:
-        start_at_date = start_at_date.replace(tzinfo=arizona_tz)
+        start_at_date = start_at_date.replace(
+            tzinfo=arizona_tz
+        )
 
     if end_at_date and end_at_date.tzinfo is None:
-        end_at_date = end_at_date.replace(tzinfo=arizona_tz)    
+        end_at_date = end_at_date.replace(
+            tzinfo=arizona_tz
+        )
 
-    # Valid parameter inputs
-    # no params:
-    #  Description: live mode
-    #   start = will be generated to be end of the start day
-    #  orders will include orders from start of today to present
-    # start only
-    #   end = will be generated to be end of the start day
-    # start & end
-    #   orders will include orders between start and end times
-    
-    live = False
-
-    if start_at_date and not end_at_date:
+    if not start:
         return {
-            "error_title": "End Date Error",
-            "error_message": "enddate parameter was provided but is not valid",
+            "error_title": "Start Date Required",
+            "error_message": "A start date and time are required.",
         }
-    
-    if not start_at_date: 
-        live = True
 
-        arizona_tz = ZoneInfo("America/Phoenix")
+    if not end:
+        return {
+            "error_title": "End Date Required",
+            "error_message": "An end date and time are required.",
+        }
 
-        now = datetime.now(arizona_tz)
-
-        start_of_day = now.replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-
-        start_at = start_of_day.isoformat()
-
-        logger.info(
-            "Generating start_at time to be beginning of the day: %s",
-            start_at,
-        )
-    else:
-        start_at = start_at_date.isoformat()
-
+    if not start_at_date:
+        return {
+            "error_title": "Start Date Error",
+            "error_message": "The start date and time are not valid.",
+        }
 
     if not end_at_date:
-        # set day to end of day today
-        arizona_tz = ZoneInfo("America/Phoenix")
+        return {
+            "error_title": "End Date Error",
+            "error_message": "The end date and time are not valid.",
+        }
 
-        now = datetime.now(arizona_tz)
+    if end_at_date < start_at_date:
+        return {
+            "error_title": "Date Range Error",
+            "error_message": "The end date and time must be after the start date and time.",
+        }
 
-        end_of_day = now.replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
+    max_span = timedelta(days=3)
 
-        end_of_day = end_of_day + timedelta(days=1)        
-
-        end_at = end_of_day.isoformat()
-    else:    
-        end_at = end_at_date.isoformat()
-
+    if end_at_date - start_at_date > max_span:
+        return {
+            "error_title": "Date Range Too Long",
+            "error_message": "The order report can cover a maximum of 3 days.",
+        }
 
     return {
-        "live": live,
-        "start_at": start_at,
-        "end_at": end_at,
+        "start_at": start_at_date.isoformat(),
+        "end_at": end_at_date.isoformat(),
     }
 
 
@@ -634,18 +612,11 @@ async def fetch_poynt_orders(
     user_id,
     start_at,
     end_at,
-    live,
 ):
     client = PoyntClient(
         credentials,
         user_id=user_id,
     )
-
-    if live:
-        return await client.get_recent_orders(
-            100,
-            start_at=start_at,
-        )
 
     return await client.get_recent_orders(
         100,
@@ -947,25 +918,42 @@ async def poynt_orders(
             status_code=303
         )
 
+    if not start and not end:
+        return templates.TemplateResponse(
+            request=request,
+            name="orders.html",
+            context={
+                "report_generated": False,
+                "validation_title": "",
+                "validation_message": "Enter a start and end date and time to generate order metrics.",
+                "start_input_value": "",
+                "end_input_value": "",
+                "chart_data_json": "[]",
+                "item_flow_json": "[]",
+                "revenue_flow_json": "[]",
+            },
+        )
+
     order_date_params = get_orders_date_range(start, end)
 
     if "error_title" in order_date_params:
         return templates.TemplateResponse(
             request=request,
-            name="message.html",
+            name="orders.html",
             context={
-                "title": order_date_params["error_title"],
-                "paragraphs": [
-                    order_date_params["error_message"]
-                ],
-                "show_dashboard_link": True,
+                "report_generated": False,
+                "validation_title": order_date_params["error_title"],
+                "validation_message": order_date_params["error_message"],
+                "start_input_value": start,
+                "end_input_value": end,
+                "chart_data_json": "[]",
+                "item_flow_json": "[]",
+                "revenue_flow_json": "[]",
             },
-            status_code=404,
         )
 
     start_at = order_date_params['start_at']
     end_at = order_date_params['end_at']
-    live = order_date_params['live']
 
     # preserve inputs    
     start_input_value = start
@@ -993,7 +981,6 @@ async def poynt_orders(
             user_id,
             start_at,
             end_at,
-            live,
         )
 
     except PoyntReauthorizationRequired:
@@ -1030,6 +1017,7 @@ async def poynt_orders(
             },
             status_code=502,
         )
+
 
     summary_text = f"{len(orders)}"
 
@@ -1167,6 +1155,7 @@ async def poynt_orders(
         request=request,
         name="orders.html",
         context={
+            "report_generated": True,
             "summary_text": summary_text,
             "cancelled_order_count": cancelled_order_count,
             "total_revenue_display": total_revenue_display,

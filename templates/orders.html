@@ -285,6 +285,16 @@
         </form>
     <div>
 
+    {% if validation_title %}
+        <div class="validation-message">
+            <h2>{{validation_title}}</h2>
+            <p>{{validation_message}}</p>
+        </div>
+    {% endif %}            
+
+    {% if report_generated %}
+
+
     <div class="clearfix"></div>
 
     <div>
@@ -581,6 +591,8 @@
         {% endfor %}
 
     </div>
+    {% endif %}
+
 
     <p>
         <a href="/dashboard">
