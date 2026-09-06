@@ -63,6 +63,10 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory="templates")
 
+@app.get("/", include_in_schema=False)
+async def root():
+    return RedirectResponse("/dashboard", status_code=303)
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
