@@ -1184,6 +1184,12 @@ async def poynt_orders(
 
     total_revenue_display = f"${total_revenue:,.2f}"
     total_tips_display = f"${total_tips:,.2f}"
+    revenue_per_hour = total_revenue / (order_span_seconds / 3600) if order_span_seconds else 0
+    revenue_per_hour_display = f"${revenue_per_hour:,.2f}"  
+    cog_ratio = 0.25
+    tax_rate_estimate = 0.083
+    profit_rate_per_hour = revenue_per_hour * (1 - cog_ratio - tax_rate_estimate)
+    profit_per_hour_display = f"${profit_rate_per_hour:,.2f}"   
 
     fastest_1_item = fastest_processing.get("1")
     fastest_2_item = fastest_processing.get("2")
@@ -1300,6 +1306,8 @@ async def poynt_orders(
             "chart_data_json": chart_data_json,
             "item_flow_json": item_flow_json,
             "revenue_flow_json": revenue_flow_json,
+            "revenue_per_hour_display": revenue_per_hour_display,
+            "profit_per_hour_display": profit_per_hour_display,
         },
     )
 

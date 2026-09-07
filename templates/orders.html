@@ -422,27 +422,16 @@
             Cancelled Orders:
             <strong>{{cancelled_order_count}}</strong>
         </div>
-        
-        <div class="dashboard-tidbit">
-            Revenue:
-            <strong>{{total_revenue_display}}</strong>
-        </div>
         <div class="dashboard-tidbit">
             Items:
             <strong>{{total_items_display}}</strong>
         </div>
+        
         <div class="dashboard-tidbit">
             Items per Order:
             <strong>{{items_per_order_display}}</strong>
         </div>
-        <div class="dashboard-tidbit">
-            Tips:
-            <strong>{{total_tips_display}}</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            Tip Ratio:
-            <strong>{{tip_ratio_display}}</strong>
-        </div>
+
         <div class="dashboard-tidbit">
             Avg order:
             <strong>{{average_seconds_display}} sec</strong>
@@ -452,6 +441,35 @@
             <strong>{{average_seconds_between_items_display}} sec</strong>
         </div>
     </div>
+
+    <div class="clearfix"></div>
+
+    <div>    
+        <div class="dashboard-tidbit">
+            Revenue:
+            <strong>{{total_revenue_display}}</strong>
+        </div>
+
+        <div class="dashboard-tidbit">
+            Revenue per Hour:
+            <strong>{{revenue_per_hour_display}}</strong>
+        </div>
+        <div class="dashboard-tidbit">
+            Profit per Hour:
+            <strong>{{profit_per_hour_display}}</strong>
+        </div>        
+
+        <div class="dashboard-tidbit">
+            Tips:
+            <strong>{{total_tips_display}}</strong>
+        </div>
+
+        <div class="dashboard-tidbit">
+            Tip Ratio:
+            <strong>{{tip_ratio_display}}</strong>
+        </div>
+
+    </div>    
 
     <div class="clearfix"></div>
 
