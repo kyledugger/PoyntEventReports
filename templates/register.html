@@ -1,53 +1,99 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Create Account - Codelian Poynt</title>
-</head>
+{% extends "base.html" %}
 
-<body>
+{% block title %}Create Account - Codelian Poynt{% endblock %}
 
-    <h1>Create Codelian Account</h1>
+{% block content %}
 
-    {% if error %}
-        <p>{{ error }}</p>
-    {% endif %}
+<section class="section">
+    <div class="container">
 
-    <form method="post">
+        <div class="columns is-centered">
+            <div class="column is-5-tablet is-4-desktop">
 
-        <div>
-            <label for="email">Email:</label>
-            <input
-                type="email"
-                id="email"
-                name="email"
-                required
-            >
+                <div class="box poynt-auth-box">
+
+                    <h1 class="title has-text-centered poynt-brand">
+                        Poynt
+                    </h1>
+
+                    <p class="subtitle has-text-centered">
+                        Create your account
+                    </p>
+
+                    {% if error %}
+                        <div class="notification is-danger is-light">
+                            {{ error }}
+                        </div>
+                    {% endif %}
+
+                    <form method="post">
+
+                        <div class="field">
+                            <label
+                                class="label"
+                                for="email"
+                            >
+                                Email
+                            </label>
+
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label
+                                class="label"
+                                for="password"
+                            >
+                                Password
+                            </label>
+
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+                        <div class="field mt-5">
+                            <div class="control">
+                                <button
+                                    type="submit"
+                                    class="button is-primary is-fullwidth"
+                                >
+                                    Create Account
+                                </button>
+                            </div>
+                        </div>
+
+                    </form>
+
+                    <div class="has-text-centered mt-5">
+                        <p>
+                            Already have an account?
+                            <a href="/login">
+                                Log in
+                            </a>
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
         </div>
 
-        <br>
+    </div>
+</section>
 
-        <div>
-            <label for="password">Password:</label>
-            <input
-                type="password"
-                id="password"
-                name="password"
-                required
-            >
-        </div>
-
-        <br>
-
-        <button type="submit">
-            Create Account
-        </button>
-
-    </form>
-
-    <p>
-        Already have an account?
-        <a href="/login">Log in</a>
-    </p>
-
-</body>
-</html>
+{% endblock %}

@@ -1,705 +1,788 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>        
-    <title>Orders Report</title>
+{% extends "base.html" %}
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-        }
+{% block title %}Orders Report{% endblock %}
 
-        h1 {
-            margin-bottom: 5px;
-        }
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-        .summary {
-            margin-bottom: 10px;
-        }
+<style>
+    .orders-page {
+        padding-top: 2rem;
+    }
 
-        .order {
-            margin-bottom: 25px;
-            border: 1px solid #aaa;
-            padding: 12px;
-        }
-
-        .order-header {
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 20px;
-            align-items: center;
-            margin-bottom: 10px;
-            font-size: 18px;
-        }
-
-        .status {
-            margin-left: 10px;
-            font-size: 14px;
-            font-weight: normal;
-        }
-
-        table {
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        th,
-        td {
-            border: 1px solid #ccc;
-            padding: 7px;
-            text-align: left;
-            vertical-align: top;
-        }
-
-        th {
-            font-weight: bold;
-        }
-        .sku-summary {
-            margin-bottom: 30px;
-        }
-
-        .sku-summary table {
-            width: 400px;
-        }
-
-        .sku-summary th,
-        .sku-summary td {
-            padding: 7px;
-        } 
-        .reports {
-            display: flex;
-            gap: 30px;
-            align-items: flex-start;
-            margin-bottom: 30px;
-            margin-top: 30px;
-            {{chart_display_flag}}                    
-        }
-
-        .report {
-            width: 400px;
-            padding: 30px;
-            background-color: #f2f2f2;
-            border-radius: 10x;
-            border-collapse: separate;                    
-        }
-
-        .report h2 {
-            margin-bottom: 20px;
-            margin-top:0px;
-            padding: 0px;
-        }  
-
-        .product_name { 
-            width: 300px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;                
-        }
-        .product_qty { 
-            width: 50px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;                   
-        }
-        .product_sku { 
-            width: 200px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;                   
-        
-        }
-        .order_notes { 
-            width: 300px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;                   
-        }                
-
-        .chart-container {
-            position: relative;
-            width: 100%;
-            height: 350px;
-            margin-bottom: 50px;
-        }
-
-        .chart-container h2 {
-            margin-bottom: 10px;
-        }
-
-        .notes-container {
-            margin-bottom: 5px;
-        }
-        .notes_header {
-            font-weight: bold;
-            width: 50px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;
-            border: 1px solid #ccc;
-            padding: 7px;
-            text-align: left;
-            vertical-align: top;                                         
-        }
-        .notes {
-            width: 800px;
-            overflow: hidden;
-            display: inline-block;
-            white-space: nowrap;   
-            border: 1px solid #ccc;
-            padding: 7px;
-            text-align: left;
-            vertical-align: top;                                      
-        }
-
-        .metrics-controls {
-            display: flex;
-            align-items: flex-end;
-            gap: 15px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-
-        .date-field {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .date-field label {
-            font-weight: bold;
-        }
-
-        .date-field input {
-            font-size: 16px;
-            padding: 7px;
-        }
-
-        .metrics-controls button {
-            font-size: 16px;
-            padding: 7px 14px;
-            cursor: pointer;
-        }
-
-        .store-selector {
-            display: inline-block;
-            margin: 0 10px;
-            vertical-align: top;
-        }
-
-        .store-selector-title {
-            margin-bottom: 5px;
-        }
-
-        .store-selector label {
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .store-options {
-            margin-top: 5px;
-            padding-left: 10px;
-        }
-
-        .orders-loading {
-            display: none;
-            margin: 30px 0;
-            text-align: center;
-        }
-
-        .orders-loading .spinner {
-            width: 40px;
-            height: 40px;
-            margin: 0 auto 15px;
-            border: 4px solid #ddd;
-            border-top-color: #333;
-            border-radius: 50%;
-            animation: orders-spin 0.8s linear infinite;
-        }
-
-        @keyframes orders-spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }                
-
-        .dashboard-tidbit {
-            margin-right: 5px;
-            margin-bottom: 5px;
-            margin-top: 5px;
-            padding: 6px;
-            float: left;
-            display: inline;
-            border: 1px solid black;                                        
-            background-color: #f1f1f1;
-            border-radius: 6x;
-            border-collapse: separate;                    
-        }
-
-        .dashboard-dash {
-            margin-right: 5px;
-            padding: 5px;
-            float: left;
-            display: inline;
-        }
-        .dashboard-load {
-            padding-top: 37px;
-            font-style: italic;
-            float: right:
-        }
-
-        .main_head {
-            float: left;
-        }
-
-        .clearfix::after {
-        content: "";
-        clear: both;
-        display: table;
-        }
-
-        .row {
+    .orders-header {
         display: flex;
-        justify-content: space-between; /* pushes first left, second right */
-        width: 100%; /* optional, but common */
-        }     
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
 
-        .charts {
-            {{chart_display_flag}}
-        }     
+    .orders-loaded {
+        color: #777;
+        font-size: 0.9rem;
+        white-space: nowrap;
+    }
 
-        .orders-list {
-            margin-top: 20px;
-        }       
-            
-                        
-    </style>
-</head>
+    .metrics-form {
+        margin-bottom: 2rem;
+    }
 
-<body>
+    .store-options {
+        margin-top: 0.5rem;
+        padding-left: 0.5rem;
+    }
 
-    <div class="row">
-        <div class="main_head"><h1>Orders Report</h1></div>
-        <div class="dashboard-load">
-            Loaded:
-            <time id="page-loaded-time"></time>
-        </div>
-    </div>
+    .store-options label {
+        display: block;
+        margin-bottom: 0.35rem;
+    }
 
-    <div class="clearfix"></div>
+    .orders-loading {
+        display: none;
+        margin: 2rem 0;
+        text-align: center;
+    }
 
-    <div>
-        <form id="orders-form" method="get" action="/poynt/orders">
+    .orders-loading .spinner {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 15px;
+        border: 4px solid #ddd;
+        border-top-color: #333;
+        border-radius: 50%;
+        animation: orders-spin 0.8s linear infinite;
+    }
 
-            <div class="metrics-controls">
+    .order-span-value {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+    }
 
-                <div class="date-field">
-                    <label for="start">Start</label>
-                    <input
-                        type="datetime-local"
-                        id="start"
-                        name="start"
-                        value="{{start_input_value}}"
-                    >
-                </div>
+    .order-span-value .local-time {
+        display: inline;
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
 
-                <div class="date-field">
-                    <label for="end">End</label>
-                    <input
-                        type="datetime-local"
-                        id="end"
-                        name="end"
-                        value="{{end_input_value}}"
-                    >
-                </div>
+    .order-span-arrow {
+        color: #777;
+        font-size: 0.9rem;
+    }
 
-                <button type="button" onclick="setToday()">
-                    Today
-                </button>
+    @keyframes orders-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
 
-                {% if available_stores %}
-                    <div class="store-selector">
-                        <div class="store-selector-title">
-                            <strong>Stores</strong>
-                        </div>
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 1rem;
+    }
 
-                        <label>
-                            <input
-                                type="checkbox"
-                                id="all-stores"
-                                {% if selected_stores|length == available_stores|length %}checked{% endif %}
-                            >
-                            All Stores
-                        </label>
+    .metric-card {
+        padding: 0.55rem 1rem;
+        margin: 0 !important;
+        border: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+        min-width: 0;
+    }
 
-                        <div class="store-options">
-                            {% for store in available_stores %}
-                                <label>
-                                    <input
-                                        type="checkbox"
-                                        name="stores"
-                                        value="{{store.id}}"
-                                        class="store-checkbox"
-                                        {% if store.id in selected_stores %}checked{% endif %}
-                                    >
-                                    {{store.name}}
-                                </label>
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
+    .metric-card:last-child {
+        border-right: 0;
+    }
 
-                <button type="submit">
-                    Generate
-                </button>
+    .metric-label {
+        font-size: 0.72rem;
+        color: #777;
+        margin-bottom: 0.1rem;
+        white-space: nowrap;
+    }
 
+    .metric-value {
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .order-span-value {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        white-space: nowrap;
+    }
+
+    .order-span-value .local-time {
+        display: inline;
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    .order-span-arrow {
+        color: #777;
+        flex-shrink: 0;
+    }
+
+    .order-activity-grid {
+        display: grid;
+        grid-template-columns: max-content repeat(3, 1fr);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .order-activity-grid .metric-card {
+        min-width: 0;
+        padding: 0.55rem 1rem;
+        border: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .order-activity-grid .metric-card:last-child {
+        border-right: 0;
+    }
+
+    .order-activity-grid .order-span-value {
+        white-space: nowrap;
+    }    
+
+    @media screen and (max-width: 900px) {
+        .metric-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .metric-card:nth-child(2n) {
+            border-right: 0;
+        }
+    }
+
+    @media screen and (max-width: 600px) {
+        .metric-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .metric-card {
+            border-right: 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .metric-card:last-child {
+            border-bottom: 0;
+        }
+    }
+
+   .metric-label {
+        font-size: 0.8rem;
+        color: #777;
+        margin-bottom: 0.2rem;
+    }
+
+    .metric-value {
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+
+    .metric-card .local-time {
+        font-size: 0.9rem;
+        white-space: normal;
+    }
+
+    .metric-card .has-text-grey {
+        font-size: 0.85rem;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 350px;
+    }
+
+    .report-card {
+        height: 100%;
+    }
+
+    .orders-list {
+        margin-top: 2rem;
+    }
+
+    .order-card {
+        margin-bottom: 1.5rem;
+    }
+
+    .order-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+
+    .order-number {
+        font-size: 1.15rem;
+        font-weight: 600;
+    }
+
+    .order-total {
+        font-size: 1.15rem;
+        font-weight: 600;
+    }
+
+    .order-notes {
+        margin-bottom: 1rem;
+    }
+
+    .local-time {
+        white-space: nowrap;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    @media screen and (max-width: 768px) {
+        .orders-header {
+            flex-direction: column;
+        }
+
+        .orders-loaded {
+            white-space: normal;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<section class="section orders-page">
+    <div class="container is-fluid">
+
+        <div class="orders-header">
+            <div>
+                <h1 class="title mb-2">Orders Report</h1>
+                <p class="subtitle is-6 mb-0">
+                    Review order activity, sales performance, and item flow.
+                </p>
             </div>
 
-        </form>
+            <div class="orders-loaded">
+                Loaded:
+                <time id="page-loaded-time"></time>
+            </div>
+        </div>
 
+
+        <!-- Report Controls -->
+        <div class="box metrics-form">
+            <form id="orders-form" method="get" action="/poynt/orders">
+
+                <div class="columns is-multiline">
+
+                    <div class="column is-12-mobile is-4-tablet is-3-desktop">
+                        <div class="field">
+                            <label class="label" for="start">Start</label>
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="datetime-local"
+                                    id="start"
+                                    name="start"
+                                    value="{{start_input_value}}"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="column is-12-mobile is-4-tablet is-3-desktop">
+                        <div class="field">
+                            <label class="label" for="end">End</label>
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="datetime-local"
+                                    id="end"
+                                    name="end"
+                                    value="{{end_input_value}}"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+
+                    {% if available_stores %}
+                    <div class="column is-12-mobile is-4-tablet is-3-desktop">
+                        <div class="field">
+                            <label class="label">Stores</label>
+
+                            <label class="checkbox mb-2">
+                                <input
+                                    type="checkbox"
+                                    id="all-stores"
+                                    {% if selected_stores|length == available_stores|length %}checked{% endif %}
+                                >
+                                All Stores
+                            </label>
+
+                            <div class="store-options">
+                                {% for store in available_stores %}
+                                    <label class="checkbox">
+                                        <input
+                                            type="checkbox"
+                                            name="stores"
+                                            value="{{store.id}}"
+                                            class="store-checkbox"
+                                            {% if store.id in selected_stores %}checked{% endif %}
+                                        >
+                                        {{store.name}}
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+
+                    <div class="column is-12-mobile is-12-tablet is-3-desktop">
+                        <div class="field is-flex is-align-items-flex-end">
+                            <div class="buttons">
+                                <button
+                                    type="button"
+                                    class="button"
+                                    onclick="setToday()"
+                                >
+                                    Today
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    class="button is-primary"
+                                >
+                                    Generate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+
+
+        <!-- Loading -->
         <div id="orders-loading" class="orders-loading">
             <div class="spinner"></div>
             <p>Collecting orders and calculating metrics...</p>
         </div>
 
-    <div>
 
-    {% if validation_title %}
-        <div class="validation-message">
-            <h2>{{validation_title}}</h2>
-            <p>{{validation_message}}</p>
-        </div>
-    {% endif %}            
-
-    {% if report_generated %}
+        {% if validation_title %}
+            <div class="notification is-warning validation-message">
+                <h2 class="title is-5">{{validation_title}}</h2>
+                <p>{{validation_message}}</p>
+            </div>
+        {% endif %}
 
 
-    <div data-orders-report>
-    <div class="clearfix"></div>
+        {% if report_generated %}
 
-    <div>
-        <div class="dashboard-tidbit">
-            <strong>
-            Orders span:
-            </strong>
-        </div>            
-            
+        <div data-orders-report>
 
-        <div class="dashboard-tidbit">
-            <strong>
-                <time
-                    class="local-time"
-                    datetime="{{oldest_order_iso}}"
-                >{{oldest_order_iso}}</time>
-            </strong>
-        </div>            
-        <div class="dashboard-dash">
-            <strong>-</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            <strong>
-                <time
-                    class="local-time"
-                    datetime="{{newest_order_iso}}"
-                >{{newest_order_iso}}</time>
-            </strong>
-        </div>            
-        <div class="dashboard-tidbit">
-            <strong>{{order_span_time_duration_display}}</strong>
-        </div>
+        <div class="mb-3">
+            <h2 class="title is-5">Order Report</h2>
 
-    </div>  
+            <div class="order-activity-grid">
 
-    <div class="clearfix"></div>
+                <div class="metric-card">
+                    <div class="metric-label">Orders Span</div>
 
-    <div>
-        <div class="dashboard-tidbit">
-            Orders:
-            <strong>{{summary_text}}</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            Cancelled Orders:
-            <strong>{{cancelled_order_count}}</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            Items:
-            <strong>{{total_items_display}}</strong>
-        </div>
-        
-        <div class="dashboard-tidbit">
-            Items per Order:
-            <strong>{{items_per_order_display}}</strong>
-        </div>
-
-        <div class="dashboard-tidbit">
-            Avg order:
-            <strong>{{average_seconds_display}} sec</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            Avg item:
-            <strong>{{average_seconds_between_items_display}} sec</strong>
-        </div>
-    </div>
-
-    <div class="clearfix"></div>
-
-    <div>    
-        <div class="dashboard-tidbit">
-            Revenue:
-            <strong>{{total_revenue_display}}</strong>
-        </div>
-
-        <div class="dashboard-tidbit">
-            Revenue per Hour:
-            <strong>{{revenue_per_hour_display}}</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            Profit per Hour:
-            <strong>{{profit_per_hour_display}}</strong>
-        </div>        
-
-        <div class="dashboard-tidbit">
-            Tips:
-            <strong>{{total_tips_display}}</strong>
-        </div>
-
-        <div class="dashboard-tidbit">
-            Tip Ratio:
-            <strong>{{tip_ratio_display}}</strong>
-        </div>
-
-    </div>    
-
-    <div class="clearfix"></div>
-
-    <div>    
-        <div class="dashboard-tidbit">
-            <strong>Fast Order Processing Times:</strong>
-        </div>              
-        <div class="dashboard-tidbit">
-            1 item:
-            <strong>{{fastest_1_item_display}} sec</strong>
-        </div>            
-        <div class="dashboard-tidbit">
-            2 item:
-            <strong>{{fastest_2_item_display}} sec</strong>
-        </div>
-        <div class="dashboard-tidbit">
-            3 item:
-            <strong>{{fastest_3_item_display}} sec</strong>
-        </div>
-    </div>
-
-    <div class="clearfix"></div>
-
-    <div>
-        <h2>Stores:</h2>    
-        <div>
-            {{stores_display}}
-        </div>
-    <div>    
-
-    <div class="clearfix"></div>
-
-    <div class="charts">
-        <div class="chart-container">
-            <h2>Time Between Orders</h2>
-
-            <canvas id="orderIntervalChart"></canvas>
-        </div>
-
-        <div class="chart-container">
-            <h2>Item Order Flow Rate</h2>
-        
-            <canvas id="itemFlowChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <h2>Revenue Flow Rate</h2>
-            <canvas id="revenueFlowChart"></canvas>
-        </div>
-    </div>
-
-    <div class="clearfix"></div>
-
-    <div class="reports">
-        <div class="report">
-            <h2>Item Counts</h2>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>SKU</th>
-                        <th>Units</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for row in sku_rows %}
-                        <tr>
-                            <td>{{row.sku}}</td>
-                            <td>{{row.quantity}}</td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="2">
-                                No SKU data available.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="report">
-            <h2>Category Counts</h2>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Units</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for row in category_rows %}
-                        <tr>
-                            <td>{{row.category}}</td>
-                            <td>{{row.quantity}}</td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="2">
-                                No category data available.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>        
-
-    <div class="clearfix"></div>
-    
-    <hr>
-
-    <div class="orders-list">
-        <h2>Orders:</h2>
-
-        {% for order in orders_data %}
-
-            <section class="order">
-
-                <div class="order-header">
-
-                    <div>
-                        <strong>
-                            Order {{order.order_number}}
-                        </strong>
-                    </div>
-
-                    <div>
+                    <div class="metric-value order-span-value">
                         <time
                             class="local-time"
-                            datetime="{{order.created_at}}"
-                        >
-                            {{order.created_at}}
-                        </time>
+                            datetime="{{oldest_order_iso}}"
+                        >{{oldest_order_iso}}</time>
+
+                        <span class="order-span-arrow">→</span>
+
+                        <time
+                            class="local-time"
+                            datetime="{{newest_order_iso}}"
+                        >{{newest_order_iso}}</time>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Duration</div>
+                    <div class="metric-value">
+                        {{order_span_time_duration_display}}
+                    </div>
+                </div>   
+            </div>
+        </div>                
+
+        <!-- Order Span -->
+        <div class="mb-4">
+            <h2 class="title is-5">Order Activity</h2>
+
+            <div class="metric-grid">
+
+                <div class="metric-card">
+                    <div class="metric-label">Orders</div>
+                    <div class="metric-value">
+                        {{summary_text}}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Cancelled Orders</div>
+                    <div class="metric-value">
+                        {{cancelled_order_count}}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Items</div>
+                    <div class="metric-value">
+                        {{total_items_display}}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Items per Order</div>
+                    <div class="metric-value">
+                        {{items_per_order_display}}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Average Order Time</div>
+                    <div class="metric-value">
+                        {{average_seconds_display}} sec
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Average Time Between Items</div>
+                    <div class="metric-value">
+                        {{average_seconds_between_items_display}} sec
+                    </div>
+                </div>
+
+                </div>
+            </div>
+
+
+            <!-- Revenue Metrics -->
+            <div class="mb-4">
+                <h2 class="title is-5">Revenue</h2>
+
+                <div class="metric-grid">
+
+                    <div class="metric-card">
+                        <div class="metric-label">Revenue</div>
+                        <div class="metric-value">
+                            {{total_revenue_display}}
+                        </div>
                     </div>
 
-                    <div>
-                        <strong>
-                            {{order.total_display}}
-                        </strong>
+                    <div class="metric-card">
+                        <div class="metric-label">Revenue per Hour</div>
+                        <div class="metric-value">
+                            {{revenue_per_hour_display}}
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Profit per Hour</div>
+                        <div class="metric-value">
+                            {{profit_per_hour_display}}
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Tips</div>
+                        <div class="metric-value">
+                            {{total_tips_display}}
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Tip Ratio</div>
+                        <div class="metric-value">
+                            {{tip_ratio_display}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Fast Processing -->
+            <div class="mb-4">
+                <h2 class="title is-5">Fast Order Processing Times</h2>
+                <div class="metric-grid">
+
+
+                    <div class="metric-card">
+                        <div class="metric-label">1 Item</div>
+                        <div class="metric-value">
+                            {{fastest_1_item_display}} sec
+                        </div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">2 Items</div>
+                        <div class="metric-value">
+                            {{fastest_2_item_display}} sec
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">3 Items</div>
+                        <div class="metric-value">
+                            {{fastest_3_item_display}} sec
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Stores -->
+            <div class="mb-4">
+                <h2 class="title is-5">Stores</h2>
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <p>{{stores_display}}</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Charts -->
+            <div class="charts" style="{{chart_display_flag}}">
+                <h2 class="title is-4">Performance Charts</h2>
+
+                <div class="columns is-multiline">
+
+                    <div class="column is-12-tablet is-12-desktop">
+                        <div class="box">
+                            <h3 class="title is-5">Time Between Orders</h3>
+                            <div class="chart-container">
+                                <canvas id="orderIntervalChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-12-tablet is-6-desktop">
+                        <div class="box">
+                            <h3 class="title is-5">Item Order Flow Rate</h3>
+                            <div class="chart-container">
+                                <canvas id="itemFlowChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-12-tablet is-6-desktop">
+                        <div class="box">
+                            <h3 class="title is-5">Revenue Flow Rate</h3>
+                            <div class="chart-container">
+                                <canvas id="revenueFlowChart"></canvas>
+                            </div>
+                        </div>
                     </div>
 
                 </div>
+            </div>
 
-                {% if order.notes %}
-                    <div class="notes-container">
-                        <table>
-                            <tr>
-                                <td class="notes_header">
-                                    Notes
-                                </td>
-                                <td class="notes">
-                                    {{order.notes}}
-                                </td>
-                            </tr>
-                        </table>
+
+            <!-- Reports -->
+            <div class="mb-5">
+                <h2 class="title is-4">Product Reports</h2>
+
+                <div class="columns">
+
+                    <div class="column is-12-tablet is-6-desktop">
+                        <div class="box report-card">
+                            <h3 class="title is-5">Item Counts</h3>
+
+                            <div class="table-container">
+                                <table class="table is-fullwidth is-striped is-hoverable">
+                                    <thead>
+                                        <tr>
+                                            <th>SKU</th>
+                                            <th>Units</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        {% for row in sku_rows %}
+                                            <tr>
+                                                <td>{{row.sku}}</td>
+                                                <td>{{row.quantity}}</td>
+                                            </tr>
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="2">
+                                                    No SKU data available.
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                {% endif %}
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th class="product_name">
-                                Item Name
-                            </th>
-                            <th class="product_qty">
-                                Qty
-                            </th>
-                            <th class="product_sku">
-                                SKU
-                            </th>
-                            <th class="product_sku">
-                                Status
-                            </th>
-                        </tr>
-                    </thead>
 
-                    <tbody>
+                    <div class="column is-12-tablet is-6-desktop">
+                        <div class="box report-card">
+                            <h3 class="title is-5">Category Counts</h3>
 
-                        {% for item in order["items"] %}
-                        
-                            <tr>
-                                <td class="product_name">
-                                    {{item.name}}
-                                </td>
-                                <td class="product_qty">
-                                    {{item.quantity}}
-                                </td>
-                                <td class="product_sku">
-                                    {{item.sku}}
-                                </td>
-                                <td class="product_sku">
-                                    {{item.status}}
-                                </td>
-                            </tr>
+                            <div class="table-container">
+                                <table class="table is-fullwidth is-striped is-hoverable">
+                                    <thead>
+                                        <tr>
+                                            <th>Category</th>
+                                            <th>Units</th>
+                                        </tr>
+                                    </thead>
 
-                        {% else %}
+                                    <tbody>
+                                        {% for row in category_rows %}
+                                            <tr>
+                                                <td>{{row.category}}</td>
+                                                <td>{{row.quantity}}</td>
+                                            </tr>
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="2">
+                                                    No category data available.
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
 
-                            <tr>
-                                <td colspan="4">
-                                    No order items.
-                                </td>
-                            </tr>
+                </div>
+            </div>
 
-                        {% endfor %}
 
-                    </tbody>
-                </table>
+            <!-- Orders -->
+            <div class="orders-list">
+                <h2 class="title is-4">Orders</h2>
 
-            </section>
+                {% for order in orders_data %}
 
-        {% else %}
+                    <section class="box order-card">
 
-            <p>No orders were returned.</p>
+                        <div class="order-header">
 
-        {% endfor %}
+                            <div class="order-number">
+                                Order {{order.order_number}}
+                            </div>
+
+                            <div>
+                                <time
+                                    class="local-time"
+                                    datetime="{{order.created_at}}"
+                                >
+                                    {{order.created_at}}
+                                </time>
+                            </div>
+
+                            <div class="order-total">
+                                {{order.total_display}}
+                            </div>
+
+                        </div>
+
+
+                        {% if order.notes %}
+                            <div class="notification is-light order-notes">
+                                <strong>Notes:</strong>
+                                {{order.notes}}
+                            </div>
+                        {% endif %}
+
+
+                        <div class="table-container">
+                            <table class="table is-fullwidth is-striped is-hoverable">
+                                <thead>
+                                    <tr>
+                                        <th>Item Name</th>
+                                        <th>Qty</th>
+                                        <th>SKU</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+
+                                    {% for item in order["items"] %}
+
+                                        <tr>
+                                            <td>{{item.name}}</td>
+                                            <td>{{item.quantity}}</td>
+                                            <td>{{item.sku}}</td>
+                                            <td>{{item.status}}</td>
+                                        </tr>
+
+                                    {% else %}
+
+                                        <tr>
+                                            <td colspan="4">
+                                                No order items.
+                                            </td>
+                                        </tr>
+
+                                    {% endfor %}
+
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </section>
+
+                {% else %}
+
+                    <div class="notification is-light">
+                        No orders were returned.
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+
+        <div class="mb-5">
+            <a href="/dashboard" class="button">
+                Return to Dashboard
+            </a>
+        </div>
 
     </div>
-    </div>
-    {% endif %}
+</section>
+{% endblock %}
 
 
-    <p>
-        <a href="/dashboard">
-            Return to Dashboard
-        </a>
-    </p>
-
+{% block scripts %}
     <script>
     
         document
@@ -1127,5 +1210,4 @@
                 formatForDateTimeLocal(end);
         }                                                           
     </script>
-</body>
-</html>
+{% endblock %}

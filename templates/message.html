@@ -1,36 +1,31 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{title}}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-        }
+{% extends "base.html" %}
 
-        h1 {
-            margin-bottom: 5px;
-        }
+{% block title %}{{ title }}{% endblock %}
 
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-8-tablet is-6-desktop">
 
-    </style>
+                <div class="box">
+                    <h1 class="title">{{ title }}</h1>
 
-</head>
+                    {% for paragraph in paragraphs %}
+                        <p class="mb-4">{{ paragraph }}</p>
+                    {% endfor %}
 
+                    {% if show_dashboard_link %}
+                        <div class="mt-5">
+                            <a href="/dashboard" class="button is-primary">
+                                Return to Dashboard
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
 
-<body>
-
-    <h1>{{title}}</h1>
-
-    {% for paragraph in paragraphs %}
-        <p>{{paragraph}}</p>
-    {% endfor %}
-
-    {% if show_dashboard_link %}
-        <p>
-            <a href="/dashboard">Return to Dashboard</a>
-        </p>
-    {% endif %}
-
-</body>
-</html>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

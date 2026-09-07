@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{% block title %}Codelian Poynt{% endblock %}</title>
+
+    <!-- Bulma -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bulma@1.0.4/css/bulma.min.css"
+    >
+
+    <!-- Poynt custom styles -->
+    <link
+        rel="stylesheet"
+        href="/static/css/app.css"
+    >
+
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+
+    {% block content %}
+    {% endblock %}
+
+    {% block scripts %}
+    {% endblock %}
+
+</body>
+</html>

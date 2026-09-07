@@ -1,0 +1,18 @@
+/* Poynt application styles */
+
+:root {
+    --poynt-primary: #3273dc;
+}
+
+body {
+    min-height: 100vh;
+}
+
+.poynt-auth-box {
+    margin-top: 8vh;
+}
+
+.poynt-brand {
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}

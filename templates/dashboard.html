@@ -1,114 +1,95 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Codelian Poynt Dashboard</title>
+{% extends "base.html" %}
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
-        }
+{% block title %}Dashboard - Codelian Poynt{% endblock %}
 
-        h1 {
-            margin-bottom: 5px;
-        }
+{% block content %}
 
-        .header-text {
-            float: left;            
-            display: inline;
+<section class="section">
+    <div class="container">
 
-        }        
+        <nav class="level mb-5">
 
-        .logout-block {
-            float: right;            
-            display: inline;
+            <div class="level-left">
+                <div>
+                    <h1 class="title mb-1">
+                        Event Manager
+                    </h1>
 
-        }
+                    <p class="subtitle is-6">
+                        Welcome, {{ user.email }}
+                    </p>
+                </div>
+            </div>
 
-        .clearfix::after {
-            content: "";
-            clear: both;
-            display: table;
-        }
+            <div class="level-right">
+                <form method="post" action="/logout">
+                    <button
+                        type="submit"
+                        class="button is-light"
+                    >
+                        Log Out
+                    </button>
+                </form>
+            </div>
+
+        </nav>
 
 
-    </style>    
-</head>
+        {% if poynt_connection %}
 
-<body>
+            <div class="notification is-success is-light">
+                <strong>Poynt Connected</strong>
+                <br>
+                {{ user.email }}
+            </div>
 
-    <h1>Event Manager App</h1>
+            <div class="columns">
 
-    <div>
-        <div class="header-text">
-            Welcome, {{ user.email }}
-        </div>
-        <div class="logout-block">
-            <form method="post" action="/logout">
-                <button type="submit">
-                    Log Out
-                </button>
-            </form>
-        </div>  
+                <div class="column">
+                    <a
+                        href="/poynt/orders"
+                        class="button is-primary is-fullwidth"
+                    >
+                        Orders Report
+                    </a>
+                </div>
+
+                <div class="column">
+                    <a
+                        href="/poynt/catalog"
+                        class="button is-link is-fullwidth"
+                    >
+                        Load Poynt Catalog
+                    </a>
+                </div>
+
+                <div class="column">
+                    <a
+                        href="/oauth/start"
+                        class="button is-light is-fullwidth"
+                    >
+                        Reconnect Poynt
+                    </a>
+                </div>
+
+            </div>
+
+        {% else %}
+
+            <div class="notification is-warning is-light">
+                <strong>Poynt Not Connected</strong>
+            </div>
+
+            <a
+                href="/oauth/start"
+                class="button is-primary"
+            >
+                Connect Poynt
+            </a>
+
+        {% endif %}
+
     </div>
+</section>
 
-    <div class="clearfix"></div>
-
-    <hr>
-
-    {% if poynt_connection %}
-
-        <p>
-            Poynt Connection:
-            <strong>Connected</strong>
-            {{ user.email }}
-        </p>
-    <hr>
-
-
-
-        <p>
-            <a href="/poynt/orders">
-                <button type="button">
-                    <strong>Orders Report</Strong>
-                </button>
-            </a>
-        </p>
-
-        <p>
-            <a href="/poynt/catalog">
-                <button type="button">
-                    Load Poynt Catalog
-                </button>
-            </a>
-        </p> 
-        
-        <hr>
-
-        <p>
-            <a href="/oauth/start">
-                <button type="button">
-                    Reconnect Poynt
-                </button>
-            </a>
-        </p>
-
-    {% else %}
-
-        <p>
-            Poynt Connection:
-            <strong>Not connected</strong>
-        </p>
-
-        <p>
-            <a href="/oauth/start">
-                <button type="button">
-                    Connect Poynt
-                </button>
-            </a>
-        </p>
-
-    {% endif %}
-  
-</body>
-</html>
+{% endblock %}

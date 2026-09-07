@@ -4,7 +4,7 @@ sku_mapping = {
     "BRB": "SHAVE-Barbie",
     "SHRKBT": "SHAVE-SharkAttack",
     "CRML-PPL": "ENE-CaramelApple",
-    "WTR": "WATER",
+    "WTR": "WATER-Bottle-12oz",
     "STRWBRRY-DRM": "ENE-StrawberryDream",
     "PRTTY-N-PNK": "ENE-PrettyInPink",
     "SKNNY-DP": "BAR-SkinnyDip",
@@ -94,7 +94,7 @@ sku_mapping = {
     "N-STRWBRRYDRM" : "ENE-StrawberryDream",
     "BN-YBBDBBDP" : "BAN-YabbaDabbaDip",
     "BN-PPPRMNTKSS" : "BAN-PeppermintKiss",
-    "CCNT-WTR" : "WATER",
+    "CCNT-WTR" : "CAN-CoconutWater",
     "ENE-PINACOLADA-0" : "ENE-PinaColada",
     "ENE-PEACHES-0" : "ENE-Peaches",
     "GRINVH" : "SHAVE-Grinch",
@@ -148,7 +148,13 @@ sku_mapping = {
     "BAN-BISCOFF": "BAN-Biscoff",
     "BAR-BISCOFF": "BAR-Biscoff",
     "BAR-DUBAI": "BAR-Dubai",
-    "BAN-BISCOFF": "BAB-Dubai"
+    "BAN-BISCOFF": "BAB-Dubai",
+    "WTR-BTTL": "WATER-Bottle-12oz",
+    "BN-LMNDDDCTN" : "BAN-AlmondAddiction",
+    "SHAVE-CUSTOM" : "SHAVE-Custom",
+    "BAR-VANILLA": "BAR-Vanilla",
+    "COF-CB-MAPLE": "COF-CB-Maple",
+    "COF-CB-SALTEDCARAMEL": "COF-CB-SaltedCaramel",
 }
 
 def fix_sku(sku):
