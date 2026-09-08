@@ -937,6 +937,43 @@ def get_orders_data(orders):
     return orders_data, store_ids
 
 
+
+def get_tip_calculator_data(orders):
+    """
+    Prepare the minimal order data needed by the in-browser
+    tip calculator.
+
+    Returns:
+        list of dictionaries containing:
+        - created_at: order timestamp
+        - tip_cents: captured tip amount in cents
+    """
+
+    tip_data = []
+
+    for order in orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        amounts = order.get("amounts") or {}
+        captured_totals = amounts.get("capturedTotals") or {}
+
+        tip = captured_totals.get("tipAmount", 0)
+
+        try:
+            tip_cents = int(tip)
+        except (TypeError, ValueError):
+            tip_cents = 0
+
+        tip_data.append({
+            "created_at": created_at,
+            "tip_cents": tip_cents,
+        })
+
+    return tip_data
+
 def get_stores_display(store_ids):
     """
     Convert a set of store IDs into display text.
@@ -1263,6 +1300,16 @@ async def poynt_orders(
 
     stores_display = get_stores_display(store_ids)
 
+    tip_calculator_data = get_tip_calculator_data(orders)
+
+    tip_calculator_enabled = len(store_ids) == 1
+
+    tip_calculator_store_name = (
+        stores_display
+        if tip_calculator_enabled
+        else ""
+    )
+
     available_stores = [
         {
             "id": store_id,
@@ -1308,6 +1355,11 @@ async def poynt_orders(
             "revenue_flow_json": revenue_flow_json,
             "revenue_per_hour_display": revenue_per_hour_display,
             "profit_per_hour_display": profit_per_hour_display,
+            "tip_calculator_data": tip_calculator_data,
+            "tip_calculator_enabled": tip_calculator_enabled,
+            "tip_calculator_store_name": tip_calculator_store_name,      
+            "start_at_for_tip_calculator": start_at,
+            "end_at_for_tip_calculator": end_at,                  
         },
     )
 

@@ -261,6 +261,123 @@
             white-space: normal;
         }
     }
+
+    /* ---------------------------------------------------------
+    Tip Calculator
+    --------------------------------------------------------- */
+
+    .tip-calculator-modal .modal-card {
+        width: 1100px;
+        max-width: calc(100vw - 2rem);
+    }
+
+    .tip-calculator-modal .modal-card-head {
+        padding: 1rem 1.25rem;
+    }
+
+    .tip-calculator-modal .modal-card-body {
+        padding: 1rem 1.25rem;
+        overflow-x: auto;
+    }
+
+    .tip-calculator-store {
+        margin-top: 0.15rem;
+        font-size: 0.9rem;
+    }
+
+    /* Header and rows use the exact same column structure */
+    .tip-calculator-header,
+    .tip-row {
+        display: grid;
+        grid-template-columns:
+            minmax(430px, 1fr)
+            145px
+            110px
+            125px
+            75px;
+        gap: 0.75rem;
+        align-items: center;
+        min-width: 900px;
+    }
+
+    .tip-calculator-header {
+        padding: 0 0.75rem 0.4rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--bulma-text-weak);
+    }
+
+    .tip-row {
+        padding: 0.65rem 0.75rem;
+        border-top: 1px solid var(--bulma-border);
+    }
+
+    /* Time range */
+    .tip-range-control {
+        display: grid;
+        grid-template-columns:
+            minmax(190px, 1fr)
+            auto
+            minmax(190px, 1fr);
+        gap: 0.45rem;
+        align-items: center;
+    }
+
+    .tip-range-control .input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .tip-range-arrow {
+        font-size: 1rem;
+        color: var(--bulma-text-weak);
+        text-align: center;
+    }
+
+    /* Employee +/- controls */
+    .tip-employees-control {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .tip-employees-control .button {
+        width: 2.2rem;
+        min-width: 2.2rem;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .tip-employee-count {
+        width: 3.25rem;
+        text-align: center;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    /* Money */
+    .tip-money-value {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* Delete */
+    .tip-delete {
+        justify-self: end;
+    }
+
+    /* Add button */
+    .tip-calculator-add {
+        margin-top: 0.85rem;
+    }
+
+    /* Footer */
+    .tip-calculator-modal .modal-card-foot {
+        justify-content: flex-end;
+        padding: 0.75rem 1.25rem;
+    }    
 </style>
 {% endblock %}
 
@@ -435,6 +552,18 @@
         <!-- Order Span -->
         <div class="mb-4">
             <h2 class="title is-5">Order Activity</h2>
+
+            <button
+                type="button"
+                id="tip-calculator-open"
+                class="button is-small is-primary"
+                {% if not tip_calculator_enabled %}disabled{% endif %}
+                {% if not tip_calculator_enabled %}
+                    title="Tip Calculator requires exactly one store in the report."
+                {% endif %}
+            >
+                Tip Calculator
+            </button>
 
             <div class="metric-grid">
 
@@ -779,6 +908,66 @@
 
     </div>
 </section>
+<div class="modal tip-calculator-modal" id="tip-calculator-modal">
+    
+    <div class="modal-background"></div>
+
+    <div class="modal-card">
+
+        <header class="modal-card-head">
+            <div>
+                <p class="modal-card-title">Tip Calculator</p>
+
+                <p
+                    id="tip-calculator-store"
+                    class="has-text-grey"
+                >
+                    {{ tip_calculator_store_name }}
+                </p>
+            </div>
+
+            <button
+                type="button"
+                class="delete"
+                aria-label="close"
+                id="tip-calculator-close"
+            ></button>
+        </header>
+
+        <section class="modal-card-body">
+
+            <div class="tip-calculator-header">
+                <div>Time Range</div>
+                <div class="has-text-centered">Employees</div>
+                <div>Total Tips</div>
+                <div>Per Employee</div>
+                <div></div>
+            </div>
+
+            <div id="tip-calculator-rows"></div>
+
+            <button
+                type="button"
+                id="tip-calculator-add"
+                class="button is-link is-light tip-calculator-add"
+            >
+                Add Time Range
+            </button>
+
+        </section>
+
+        <footer class="modal-card-foot is-justify-content-flex-end">
+            <button
+                type="button"
+                id="tip-calculator-done"
+                class="button is-primary"
+            >
+                Done
+            </button>
+        </footer>
+
+    </div>
+</div>
 {% endblock %}
 
 
@@ -1208,6 +1397,630 @@
 
             document.getElementById("end").value =
                 formatForDateTimeLocal(end);
-        }                                                           
+        }
+        
+        const tipCalculatorData =
+    {{ tip_calculator_data | tojson }};
+
+        const tipCalculatorEnabled =
+            {{ "true" if tip_calculator_enabled else "false" }};
+
+        const tipCalculatorStart =
+            {{ start_at_for_tip_calculator | tojson }};
+
+        const tipCalculatorEnd =
+            {{ end_at_for_tip_calculator | tojson }};
+
+        const tipCalculatorModal =
+            document.getElementById("tip-calculator-modal");
+
+        const tipCalculatorRows =
+            document.getElementById("tip-calculator-rows");
+
+        const tipCalculatorOpen =
+            document.getElementById("tip-calculator-open");
+
+        const tipCalculatorClose =
+            document.getElementById("tip-calculator-close");
+
+        const tipCalculatorDone =
+            document.getElementById("tip-calculator-done");
+
+        const tipCalculatorAdd =
+            document.getElementById("tip-calculator-add");
+
+        let tipRows = [];
+
+
+        /* ---------------------------------------------------------
+        Date helpers
+        --------------------------------------------------------- */
+
+        function toDateTimeLocalValue(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            const hours = String(date.getHours()).padStart(2, "0");
+            const minutes = String(date.getMinutes()).padStart(2, "0");
+            const seconds = String(date.getSeconds()).padStart(2, "0");
+
+            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        }
+
+
+        function formatTipDateTime(value) {
+            const date = new Date(value);
+
+            if (Number.isNaN(date.getTime())) {
+                return value;
+            }
+
+            return new Intl.DateTimeFormat(
+                undefined,
+                {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                }
+            ).format(date);
+        }
+
+
+        /* ---------------------------------------------------------
+        Currency
+        --------------------------------------------------------- */
+
+        function formatCurrency(cents) {
+            return new Intl.NumberFormat(
+                undefined,
+                {
+                    style: "currency",
+                    currency: "USD"
+                }
+            ).format(cents / 100);
+        }
+
+
+        /* ---------------------------------------------------------
+        Build / render
+        --------------------------------------------------------- */
+
+        function initializeTipCalculator() {
+
+            if (!tipCalculatorEnabled) {
+                return;
+            }
+
+            const start = new Date(tipCalculatorStart);
+            const end = new Date(tipCalculatorEnd);
+
+            tipRows = [
+                {
+                    start: start,
+                    end: end,
+                    employees: 1
+                }
+            ];
+
+            renderTipCalculator();
+        }
+
+        function renderTipCalculator() {
+
+            tipCalculatorRows.innerHTML = "";
+
+            tipRows.forEach(function(row, index) {
+
+                const rowElement = document.createElement("div");
+                rowElement.className = "tip-row";
+
+                const isFirstRow = index === 0;
+                const isLastRow = index === tipRows.length - 1;
+
+                rowElement.innerHTML = `
+                    <div class="tip-range-control">
+
+                        <input
+                            type="datetime-local"
+                            class="input tip-start"
+                            data-index="${index}"
+                            value="${toDateTimeLocalValue(row.start)}"
+                            step="1"
+                            ${isFirstRow ? "disabled" : ""}
+                        >
+
+                        <span class="tip-range-arrow">→</span>
+
+                        <input
+                            type="datetime-local"
+                            class="input tip-end"
+                            data-index="${index}"
+                            value="${toDateTimeLocalValue(row.end)}"
+                            step="1"
+                            disabled
+                        >
+
+                    </div>
+
+                    <div class="tip-employees-control">
+
+                        <button
+                            type="button"
+                            class="button is-small tip-minus"
+                            data-index="${index}"
+                            ${row.employees <= 1 ? "disabled" : ""}
+                            aria-label="Decrease employees"
+                        >
+                            −
+                        </button>
+
+                        <input
+                            type="text"
+                            class="input is-small tip-employee-count"
+                            value="${row.employees}"
+                            readonly
+                            aria-label="Number of employees"
+                        >
+
+                        <button
+                            type="button"
+                            class="button is-small tip-plus"
+                            data-index="${index}"
+                            aria-label="Increase employees"
+                        >
+                            +
+                        </button>
+
+                    </div>
+
+                    <div
+                        class="tip-money-value tip-total"
+                        data-index="${index}"
+                    >
+                        $0.00
+                    </div>
+
+                    <div
+                        class="tip-money-value tip-split"
+                        data-index="${index}"
+                    >
+                        $0.00
+                    </div>
+
+                    <div class="tip-delete">
+                        <button
+                            type="button"
+                            class="button is-small is-danger is-light tip-delete-button"
+                            data-index="${index}"
+                            ${tipRows.length === 1 ? "disabled" : ""}
+                        >
+                            Delete
+                        </button>
+                    </div>
+                `;
+
+                tipCalculatorRows.appendChild(rowElement);
+            });
+
+            attachTipRowEvents();
+            updateTipTotals();
+            updateAddButton();
+        }
+        /* ---------------------------------------------------------
+        Events
+        --------------------------------------------------------- */
+
+        function attachTipRowEvents() {
+
+            document.querySelectorAll(".tip-start")
+                .forEach(function(input) {
+
+                    input.addEventListener(
+                        "change",
+                        function() {
+
+                            const index =
+                                Number(this.dataset.index);
+
+                            const newStart =
+                                new Date(this.value);
+
+                            if (
+                                Number.isNaN(newStart.getTime())
+                            ) {
+                                return;
+                            }
+
+                            const row =
+                                tipRows[index];
+
+                            /*
+                            * Don't allow a row to extend beyond
+                            * the next row's end.
+                            */
+                            if (index > 0) {
+
+                                const previous =
+                                    tipRows[index - 1];
+
+                                const nextEnd =
+                                    row.end;
+
+                                if (
+                                    newStart <= previous.start ||
+                                    newStart >= nextEnd
+                                ) {
+                                    renderTipCalculator();
+                                    return;
+                                }
+                            }
+
+                            row.start = newStart;
+
+                            if (index > 0) {
+                                tipRows[index - 1].end =
+                                    newStart;
+                            }
+
+                            renderTipCalculator();
+                        }
+                    );
+                });
+
+
+            document.querySelectorAll(".tip-minus")
+                .forEach(function(button) {
+
+                    button.addEventListener(
+                        "click",
+                        function() {
+
+                            const index =
+                                Number(this.dataset.index);
+
+                            tipRows[index].employees =
+                                Math.max(
+                                    1,
+                                    tipRows[index].employees - 1
+                                );
+
+                            updateTipTotals();
+                            renderEmployeeCounts();
+                        }
+                    );
+                });
+
+
+            document.querySelectorAll(".tip-plus")
+                .forEach(function(button) {
+
+                    button.addEventListener(
+                        "click",
+                        function() {
+
+                            const index =
+                                Number(this.dataset.index);
+
+                            tipRows[index].employees += 1;
+
+                            updateTipTotals();
+                            renderEmployeeCounts();
+                        }
+                    );
+                });
+
+
+            document.querySelectorAll(".tip-delete-button")
+                .forEach(function(button) {
+
+                    button.addEventListener(
+                        "click",
+                        function() {
+
+                            deleteTipRow(
+                                Number(this.dataset.index)
+                            );
+                        }
+                    );
+                });
+        }
+
+
+        /* ---------------------------------------------------------
+        Employee display
+        --------------------------------------------------------- */
+
+        function renderEmployeeCounts() {
+
+            document.querySelectorAll(
+                ".tip-employee-count"
+            ).forEach(function(input) {
+
+                const index =
+                    Number(
+                        input.closest(".tip-row")
+                            .querySelector(".tip-minus")
+                            .dataset.index
+                    );
+
+                input.value =
+                    tipRows[index].employees;
+            });
+        }
+
+
+        /* ---------------------------------------------------------
+        Add / delete rows
+        --------------------------------------------------------- */
+
+        function addTipRow() {
+
+            if (tipRows.length >= 6) {
+                return;
+            }
+
+            const lastIndex =
+                tipRows.length - 1;
+
+            const lastRow =
+                tipRows[lastIndex];
+
+            const startTime =
+                lastRow.start.getTime();
+
+            const endTime =
+                lastRow.end.getTime();
+
+            const midpoint =
+                new Date(
+                    startTime +
+                    ((endTime - startTime) / 2)
+                );
+
+            if (midpoint <= lastRow.start ||
+                midpoint >= lastRow.end) {
+                return;
+            }
+
+            const originalEnd =
+                new Date(lastRow.end);
+
+            lastRow.end =
+                midpoint;
+
+            tipRows.push({
+                start: new Date(midpoint),
+                end: originalEnd,
+                employees: 1
+            });
+
+            renderTipCalculator();
+        }
+
+
+        function deleteTipRow(index) {
+
+            if (tipRows.length <= 1) {
+                return;
+            }
+
+            /*
+            * If deleting the first row, the new first
+            * row inherits the report start time.
+            */
+            if (index === 0) {
+
+                const deletedEnd =
+                    tipRows[0].end;
+
+                tipRows.splice(0, 1);
+
+                tipRows[0].start =
+                    new Date(tipCalculatorStart);
+
+                tipRows[0].end =
+                    deletedEnd;
+
+            } else {
+
+                const deletedRow =
+                    tipRows[index];
+
+                tipRows.splice(index, 1);
+
+                /*
+                * The previous row now extends to the
+                * deleted row's former end.
+                */
+                tipRows[index - 1].end =
+                    deletedRow.end;
+            }
+
+            renderTipCalculator();
+        }
+
+
+        function updateAddButton() {
+
+            if (tipRows.length >= 6) {
+
+                tipCalculatorAdd.disabled = true;
+                tipCalculatorAdd.textContent =
+                    "Maximum 6 Time Ranges";
+
+            } else {
+
+                tipCalculatorAdd.disabled = false;
+                tipCalculatorAdd.textContent =
+                    "Add Time Range";
+            }
+        }
+
+
+        /* ---------------------------------------------------------
+        Tip calculation
+        --------------------------------------------------------- */
+
+        function calculateRowTips(row, index) {
+
+            const start =
+                row.start.getTime();
+
+            const end =
+                row.end.getTime();
+
+            let totalCents = 0;
+
+            tipCalculatorData.forEach(function(order) {
+
+                const orderTime =
+                    new Date(order.created_at).getTime();
+
+                if (Number.isNaN(orderTime)) {
+                    return;
+                }
+
+                /*
+                * Ranges are:
+                *
+                * [start, end)
+                *
+                * except the final row, which includes
+                * its end point.
+                */
+                const isFinalRow =
+                    index === tipRows.length - 1;
+
+                const inRange =
+                    isFinalRow
+                        ? orderTime >= start &&
+                        orderTime <= end
+                        : orderTime >= start &&
+                        orderTime < end;
+
+                if (inRange) {
+                    totalCents +=
+                        Number(order.tip_cents || 0);
+                }
+            });
+
+            return totalCents;
+        }
+
+
+        function updateTipTotals() {
+
+            tipRows.forEach(function(row, index) {
+
+                const totalCents =
+                    calculateRowTips(row, index);
+
+                const employees =
+                    Math.max(1, row.employees);
+
+                const splitCents =
+                    Math.floor(
+                        totalCents / employees
+                    );
+
+                const totalElement =
+                    document.querySelector(
+                        `.tip-total[data-index="${index}"]`
+                    );
+
+                const splitElement =
+                    document.querySelector(
+                        `.tip-split[data-index="${index}"]`
+                    );
+
+                if (totalElement) {
+                    totalElement.textContent =
+                        formatCurrency(totalCents);
+                }
+
+                if (splitElement) {
+                    splitElement.textContent =
+                        formatCurrency(splitCents);
+                }
+            });
+        }
+
+
+        /* ---------------------------------------------------------
+        Modal
+        --------------------------------------------------------- */
+
+        function openTipCalculator() {
+
+            if (!tipCalculatorEnabled) {
+                return;
+            }
+
+            initializeTipCalculator();
+
+            tipCalculatorModal.classList.add("is-active");
+        }
+
+
+        function closeTipCalculator() {
+
+            tipCalculatorModal.classList.remove("is-active");
+        }
+
+
+        if (tipCalculatorOpen) {
+            tipCalculatorOpen.addEventListener(
+                "click",
+                openTipCalculator
+            );
+        }
+
+        if (tipCalculatorClose) {
+            tipCalculatorClose.addEventListener(
+                "click",
+                closeTipCalculator
+            );
+        }
+
+        if (tipCalculatorDone) {
+            tipCalculatorDone.addEventListener(
+                "click",
+                closeTipCalculator
+            );
+        }
+
+        if (tipCalculatorAdd) {
+            tipCalculatorAdd.addEventListener(
+                "click",
+                addTipRow
+            );
+        }
+
+        if (tipCalculatorModal) {
+            tipCalculatorModal
+                .querySelector(".modal-background")
+                .addEventListener(
+                    "click",
+                    closeTipCalculator
+                );
+        }
+
+        document.addEventListener(
+            "keydown",
+            function(event) {
+
+                if (
+                    event.key === "Escape" &&
+                    tipCalculatorModal &&
+                    tipCalculatorModal.classList.contains(
+                        "is-active"
+                    )
+                ) {
+                    closeTipCalculator();
+                }
+            }
+        );
     </script>
 {% endblock %}

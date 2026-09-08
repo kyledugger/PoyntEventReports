@@ -16,3 +16,123 @@ body {
     font-weight: 700;
     letter-spacing: -0.03em;
 }
+
+/* Tip Calculator */
+
+.order-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.order-section-heading h2 {
+    margin-bottom: 0;
+}
+
+/* --------------------------------------------------
+   Tip Calculator
+   -------------------------------------------------- */
+
+.tip-calculator-modal .modal-card {
+    width: 1100px;
+    max-width: calc(100vw - 2rem);
+}
+
+.tip-calculator-modal .modal-card-head {
+    padding: 1rem 1.25rem;
+}
+
+.tip-calculator-modal .modal-card-body {
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+}
+
+.tip-calculator-store {
+    margin-top: 0.15rem;
+    font-size: 0.9rem;
+}
+
+.tip-calculator-header,
+.tip-row {
+    display: grid;
+    grid-template-columns:
+        minmax(430px, 1fr)
+        145px
+        110px
+        125px
+        75px;
+    gap: 0.75rem;
+    align-items: center;
+    min-width: 900px;
+}
+
+.tip-calculator-header {
+    padding: 0 0.75rem 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bulma-text-weak);
+}
+
+.tip-row {
+    padding: 0.65rem 0.75rem;
+    border-top: 1px solid var(--bulma-border);
+}
+
+.tip-range-control {
+    display: grid;
+    grid-template-columns: minmax(190px, 1fr) auto minmax(190px, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.tip-range-control .input {
+    width: 100%;
+    min-width: 0;
+}
+
+.tip-range-arrow {
+    font-size: 1rem;
+    color: var(--bulma-text-weak);
+    text-align: center;
+}
+
+.tip-employees-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tip-employees-control .button {
+    width: 2.2rem;
+    min-width: 2.2rem;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.tip-employee-count {
+    width: 3.25rem;
+    text-align: center;
+    border-radius: 0;
+    margin: 0;
+}
+
+.tip-money-value {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tip-delete {
+    justify-self: end;
+}
+
+.tip-calculator-add {
+    margin-top: 0.85rem;
+}
+
+.tip-calculator-modal .modal-card-foot {
+    justify-content: flex-end;
+    padding: 0.75rem 1.25rem;
+}
