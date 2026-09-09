@@ -518,7 +518,7 @@
         <div data-orders-report>
 
         <div class="mb-3">
-            <h2 class="title is-5">Order Report</h2>
+            <h2 class="title is-5">Time Range of Order Data</h2>
 
             <div class="order-activity-grid">
 
@@ -1404,7 +1404,7 @@
         }
         
         const tipCalculatorData =
-    {{ tip_calculator_data | tojson }};
+            {{ tip_calculator_data | default([]) | tojson }};
 
         const tipCalculatorEnabled =
             {{ "true" if tip_calculator_enabled else "false" }};
