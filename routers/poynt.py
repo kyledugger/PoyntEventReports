@@ -1032,9 +1032,15 @@ async def poynt_orders(
                 "chart_data_json": "[]",
                 "item_flow_json": "[]",
                 "revenue_flow_json": "[]",
+
+                # Tip Calculator defaults
+                "tip_calculator_data": [],
+                "tip_calculator_enabled": False,
+                "tip_calculator_store_name": "",
+                "start_at_for_tip_calculator": None,
+                "end_at_for_tip_calculator": None,
             },
         )
-
     order_date_params = get_orders_date_range(start, end)
 
     if "error_title" in order_date_params:

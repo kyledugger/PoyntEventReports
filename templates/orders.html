@@ -553,18 +553,6 @@
         <div class="mb-4">
             <h2 class="title is-5">Order Activity</h2>
 
-            <button
-                type="button"
-                id="tip-calculator-open"
-                class="button is-small is-primary"
-                {% if not tip_calculator_enabled %}disabled{% endif %}
-                {% if not tip_calculator_enabled %}
-                    title="Tip Calculator requires exactly one store in the report."
-                {% endif %}
-            >
-                Tip Calculator
-            </button>
-
             <div class="metric-grid">
 
                 <div class="metric-card">
@@ -653,6 +641,22 @@
                             {{tip_ratio_display}}
                         </div>
                     </div>
+                    <div class="metric-card">
+
+                    <button
+                        type="button"
+                        id="tip-calculator-open"
+                        class="button is-small is-primary"
+                        {% if not tip_calculator_enabled %}disabled{% endif %}
+                        {% if not tip_calculator_enabled %}
+                            title="Tip Calculator requires exactly one store in the report."
+                        {% endif %}
+                    >
+                        Tip Calculator
+                    </button>
+                     </div>
+
+
                 </div>
             </div>
 
