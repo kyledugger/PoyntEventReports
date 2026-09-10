@@ -676,6 +676,7 @@
                         </button>
                     </div>                    
 
+
                     <div class="metric-card">
                         <div class="metric-label">Revenue per Hour Time Span</div>
                         <div class="metric-value">
@@ -1966,8 +1967,20 @@
                             .dataset.index
                     );
 
+                const employeeCount =
+                    Math.max(1, tipRows[index].employees);
+
                 input.value =
-                    tipRows[index].employees;
+                    employeeCount;
+
+                const minusButton =
+                    input.closest(".tip-row")
+                        .querySelector(".tip-minus");
+
+                if (minusButton) {
+                    minusButton.disabled =
+                        employeeCount <= 1;
+                }
             });
         }
 
