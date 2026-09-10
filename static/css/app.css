@@ -1,3 +1,5 @@
+
+
 /* Poynt application styles */
 
 :root {
@@ -136,3 +138,6 @@ body {
     justify-content: flex-end;
     padding: 0.75rem 1.25rem;
 }
+
+/* --- AUTOMATIC SYSTEM LIGHT/DARK METHOD --- */
+

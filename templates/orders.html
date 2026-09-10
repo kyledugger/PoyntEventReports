@@ -263,6 +263,60 @@
     }
 
     /* ---------------------------------------------------------
+    Fee Calculator
+    --------------------------------------------------------- */
+    .fee-calculator-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .fee-calculator-modal .modal-card {
+        width: 520px;
+        max-width: calc(100vw - 2rem);
+    }
+
+    .fee-calculator-modal .modal-card-head,
+    .fee-calculator-modal .modal-card-body,
+    .fee-calculator-modal .modal-card-foot {
+        padding: 1rem 1.25rem;
+    }
+
+    .fee-calculator-field {
+        margin-bottom: 1rem;
+    }
+
+    .fee-calculator-result {
+        margin-top: 1.25rem;
+        padding: 1rem;
+        border-radius: 6px;
+        background: var(--bulma-background);
+    }
+
+    .fee-calculator-result .fee-calculator-result-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+
+    .fee-calculator-input-wrap {
+        position: relative;
+    }
+
+    .fee-calculator-input-wrap .input {
+        padding-right: 2.25rem;
+    }
+
+    .fee-calculator-input-suffix {
+        position: absolute;
+        right: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--bulma-text-weak);
+        pointer-events: none;
+    }
+
+    /* ---------------------------------------------------------
     Tip Calculator
     --------------------------------------------------------- */
 
@@ -603,8 +657,6 @@
 
             <!-- Revenue Metrics -->
             <div class="mb-4">
-                <h2 class="title is-5">Revenue</h2>
-
                 <div class="metric-grid">
 
                     <div class="metric-card">
@@ -615,9 +667,27 @@
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-label">Revenue per Hour</div>
+                        <button
+                            type="button"
+                            id="fee-calculator-open"
+                            class="button is-small is-link is-light"
+                        >
+                            Fee Calculator
+                        </button>
+                    </div>                    
+
+                    <div class="metric-card">
+                        <div class="metric-label">Revenue per Hour Time Span</div>
                         <div class="metric-value">
-                            {{revenue_per_hour_display}}
+                            {{revenue_per_hour_report_display}}
+                        </div>
+                    </div>
+
+
+                    <div class="metric-card">
+                        <div class="metric-label">Revenue per Hour Orders</div>
+                        <div class="metric-value">
+                            {{revenue_per_hour_orders_display}}
                         </div>
                     </div>
 
@@ -972,11 +1042,158 @@
 
     </div>
 </div>
+
+<div class="modal fee-calculator-modal" id="fee-calculator-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">Fee Calculator</p>
+            <button type="button" class="delete" aria-label="close" id="fee-calculator-close"></button>
+        </header>
+
+        <section class="modal-card-body">
+            <div class="fee-calculator-field">
+                <label class="label">Total Revenue</label>
+                <input type="text" id="fee-calculator-revenue" class="input" readonly>
+            </div>
+
+            <div class="fee-calculator-field">
+                <label class="label" for="fee-calculator-tax-rate">Tax Rate</label>
+                <div class="fee-calculator-input-wrap">
+                    <input
+                        type="number"
+                        id="fee-calculator-tax-rate"
+                        class="input"
+                        value="8.3"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        inputmode="decimal"
+                    >
+                    <span class="fee-calculator-input-suffix">%</span>
+                </div>
+            </div>
+
+            <div class="fee-calculator-field">
+                <label class="label">Revenue Before Taxes</label>
+                <input type="text" id="fee-calculator-pre-tax" class="input" readonly>
+            </div>
+
+            <div class="field mb-4">
+                <label class="checkbox">
+                    <input type="checkbox" id="fee-calculator-include-tax">
+                    Include taxes in fee
+                </label>
+            </div>
+
+            <div class="fee-calculator-field">
+                <label class="label" for="fee-calculator-percentage">Fee Percentage</label>
+                <div class="select is-fullwidth">
+                    <select id="fee-calculator-percentage">
+                        <option value="0.05">5%</option>
+                        <option value="0.10" selected>10%</option>
+                        <option value="0.125">12.5%</option>
+                        <option value="0.15">15%</option>
+                        <option value="0.20">20%</option>
+                        <option value="0.25">25%</option>
+                        <option value="0.30">30%</option>
+                        <option value="0.35">35%</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="fee-calculator-result">
+                <div class="metric-label">Calculated Fee</div>
+                <div class="fee-calculator-result-value" id="fee-calculator-result">$0.00</div>
+            </div>
+        </section>
+
+        <footer class="modal-card-foot is-justify-content-flex-end">
+            <button type="button" id="fee-calculator-done" class="button is-primary">Done</button>
+        </footer>
+    </div>
+</div>
 {% endblock %}
 
 
 {% block scripts %}
     <script>
+        /* ---------------------------------------------------------
+        Fee Calculator
+        --------------------------------------------------------- */
+        const feeCalculatorRevenue = {{ total_revenue | default(0) | tojson }};
+        const feeCalculatorModal = document.getElementById("fee-calculator-modal");
+        const feeCalculatorOpen = document.getElementById("fee-calculator-open");
+        const feeCalculatorClose = document.getElementById("fee-calculator-close");
+        const feeCalculatorDone = document.getElementById("fee-calculator-done");
+        const feeCalculatorRevenueInput = document.getElementById("fee-calculator-revenue");
+        const feeCalculatorTaxRate = document.getElementById("fee-calculator-tax-rate");
+        const feeCalculatorPreTax = document.getElementById("fee-calculator-pre-tax");
+        const feeCalculatorIncludeTax = document.getElementById("fee-calculator-include-tax");
+        const feeCalculatorPercentage = document.getElementById("fee-calculator-percentage");
+        const feeCalculatorResult = document.getElementById("fee-calculator-result");
+
+        function formatFeeCurrency(value) {
+            return new Intl.NumberFormat(undefined, {
+                style: "currency",
+                currency: "USD"
+            }).format(value);
+        }
+
+        function updateFeeCalculator() {
+            const revenue = Number(feeCalculatorRevenue) || 0;
+            let taxRate = Number(feeCalculatorTaxRate.value);
+
+            if (!Number.isFinite(taxRate)) {
+                taxRate = 0;
+            }
+            taxRate = Math.min(100, Math.max(0, taxRate));
+
+            const preTaxRevenue = revenue * (1 - taxRate / 100);
+            const feeRate = Number(feeCalculatorPercentage.value) || 0;
+            const feeBase = feeCalculatorIncludeTax.checked
+                ? revenue
+                : preTaxRevenue;
+            const fee = feeBase * feeRate;
+
+            feeCalculatorRevenueInput.value = formatFeeCurrency(revenue);
+            feeCalculatorPreTax.value = formatFeeCurrency(preTaxRevenue);
+            feeCalculatorResult.textContent = formatFeeCurrency(fee);
+        }
+
+        function openFeeCalculator() {
+            updateFeeCalculator();
+            feeCalculatorModal.classList.add("is-active");
+        }
+
+        function closeFeeCalculator() {
+            feeCalculatorModal.classList.remove("is-active");
+        }
+
+        if (feeCalculatorOpen) {
+            feeCalculatorOpen.addEventListener("click", openFeeCalculator);
+        }
+        if (feeCalculatorClose) {
+            feeCalculatorClose.addEventListener("click", closeFeeCalculator);
+        }
+        if (feeCalculatorDone) {
+            feeCalculatorDone.addEventListener("click", closeFeeCalculator);
+        }
+        if (feeCalculatorModal) {
+            feeCalculatorModal.querySelector(".modal-background")
+                .addEventListener("click", closeFeeCalculator);
+        }
+        if (feeCalculatorTaxRate) {
+            feeCalculatorTaxRate.addEventListener("input", updateFeeCalculator);
+        }
+        if (feeCalculatorIncludeTax) {
+            feeCalculatorIncludeTax.addEventListener("change", updateFeeCalculator);
+        }
+        if (feeCalculatorPercentage) {
+            feeCalculatorPercentage.addEventListener("change", updateFeeCalculator);
+        }
+
+
     
         document
             .querySelectorAll(".local-time")
@@ -2015,14 +2232,23 @@
             "keydown",
             function(event) {
 
+                if (event.key !== "Escape") {
+                    return;
+                }
+
                 if (
-                    event.key === "Escape" &&
                     tipCalculatorModal &&
-                    tipCalculatorModal.classList.contains(
-                        "is-active"
-                    )
+                    tipCalculatorModal.classList.contains("is-active")
                 ) {
                     closeTipCalculator();
+                    return;
+                }
+
+                if (
+                    feeCalculatorModal &&
+                    feeCalculatorModal.classList.contains("is-active")
+                ) {
+                    closeFeeCalculator();
                 }
             }
         );

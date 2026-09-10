@@ -155,6 +155,10 @@ sku_mapping = {
     "BAR-VANILLA": "BAR-Vanilla",
     "COF-CB-MAPLE": "COF-CB-Maple",
     "COF-CB-SALTEDCARAMEL": "COF-CB-SaltedCaramel",
+    "SHAVE-RAINBOW" : "SHAVE-Rainbow",
+    "SHAVE-SHARKATTACK" : "SHAVE-SharkAttack",
+    "SHAVE-BARBIE" : "SHAVE-Barbie",
+    
 }
 
 def fix_sku(sku):

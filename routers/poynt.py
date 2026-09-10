@@ -662,9 +662,16 @@ def get_orders_date_range(start, end):
             "error_message": "The order report can cover a maximum of 3 days.",
         }
 
+
+    span_seconds = end_at_date - start_at_date if start_at_date and end_at_date else None
+
+    if span_seconds:
+        span_seconds = span_seconds.total_seconds()
+    
     return {
         "start_at": start_at_date.isoformat(),
         "end_at": end_at_date.isoformat(),
+        "span_seconds": span_seconds,
     }
 
 
@@ -1061,6 +1068,7 @@ async def poynt_orders(
 
     start_at = order_date_params['start_at']
     end_at = order_date_params['end_at']
+    report_span_seconds = order_date_params['span_seconds'] 
 
     # preserve inputs    
     start_input_value = start
@@ -1227,11 +1235,13 @@ async def poynt_orders(
 
     total_revenue_display = f"${total_revenue:,.2f}"
     total_tips_display = f"${total_tips:,.2f}"
-    revenue_per_hour = total_revenue / (order_span_seconds / 3600) if order_span_seconds else 0
-    revenue_per_hour_display = f"${revenue_per_hour:,.2f}"  
+    revenue_per_hour_orders = total_revenue / (order_span_seconds / 3600) if order_span_seconds else 0
+    revenue_per_hour_orders_display = f"${revenue_per_hour_orders:,.2f}"  
+    revenue_per_hour_range = total_revenue / (report_span_seconds / 3600) if order_span_seconds else 0
+    revenue_per_hour_report_display = f"${revenue_per_hour_range:,.2f}"  
     cog_ratio = 0.25
     tax_rate_estimate = 0.083
-    profit_rate_per_hour = revenue_per_hour * (1 - cog_ratio - tax_rate_estimate)
+    profit_rate_per_hour = revenue_per_hour_range * (1 - cog_ratio - tax_rate_estimate)
     profit_per_hour_display = f"${profit_rate_per_hour:,.2f}"   
 
     fastest_1_item = fastest_processing.get("1")
@@ -1335,6 +1345,7 @@ async def poynt_orders(
             "summary_text": summary_text,
             "cancelled_order_count": cancelled_order_count,
             "total_revenue_display": total_revenue_display,
+            "total_revenue": total_revenue,
             "total_items_display": total_items_display,
             "items_per_order_display": items_per_order_display,
             "total_tips_display": total_tips_display,
@@ -1359,7 +1370,8 @@ async def poynt_orders(
             "chart_data_json": chart_data_json,
             "item_flow_json": item_flow_json,
             "revenue_flow_json": revenue_flow_json,
-            "revenue_per_hour_display": revenue_per_hour_display,
+            "revenue_per_hour_orders_display": revenue_per_hour_orders_display,
+            "revenue_per_hour_report_display": revenue_per_hour_report_display,
             "profit_per_hour_display": profit_per_hour_display,
             "tip_calculator_data": tip_calculator_data,
             "tip_calculator_enabled": tip_calculator_enabled,
