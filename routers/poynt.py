@@ -17,11 +17,8 @@ from poynt.client import (
 
 from dotenv import load_dotenv
 import os
-from poynt.connection import (
-    get_poynt_connection,
-    get_poynt_credentials,
-    save_poynt_connection,
-)
+from poynt.connection import get_poynt_credentials
+from organization_context import get_current_organization_id
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
 load_dotenv(dotenv_file)
@@ -50,7 +47,16 @@ async def poynt_catalog(request: Request):
             status_code=303
         )
 
-    credentials = get_poynt_credentials(user_id)
+    organization_id = get_current_organization_id(request)
+
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    credentials = get_poynt_credentials(organization_id)
 
     if not credentials:
         return templates.TemplateResponse(
@@ -1026,6 +1032,15 @@ async def poynt_orders(
             status_code=303
         )
 
+    organization_id = get_current_organization_id(request)
+
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
     if not start and not end:
         return templates.TemplateResponse(
             request=request,
@@ -1074,7 +1089,7 @@ async def poynt_orders(
     start_input_value = start
     end_input_value = end    
 
-    credentials = get_poynt_credentials(user_id)
+    credentials = get_poynt_credentials(organization_id)
 
     if not credentials:
         return templates.TemplateResponse(
@@ -1397,7 +1412,16 @@ async def poynt_stores(
             status_code=303
         )
 
-    credentials = get_poynt_credentials(user_id)
+    organization_id = get_current_organization_id(request)
+
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    credentials = get_poynt_credentials(organization_id)
 
     if not credentials:
         return templates.TemplateResponse(
