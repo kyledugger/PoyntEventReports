@@ -1,99 +1,66 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Account - Codelian Poynt</title>
+</head>
 
-{% block title %}Create Account - Codelian Poynt{% endblock %}
+<body>
 
-{% block content %}
+    <h1>Create Account</h1>
 
-<section class="section">
-    <div class="container">
+    {% if error %}
+        <p>{{ error }}</p>
+    {% endif %}
 
-        <div class="columns is-centered">
-            <div class="column is-5-tablet is-4-desktop">
+    <form method="post">
 
-                <div class="box poynt-auth-box">
-
-                    <h1 class="title has-text-centered poynt-brand">
-                        Poynt
-                    </h1>
-
-                    <p class="subtitle has-text-centered">
-                        Create your account
-                    </p>
-
-                    {% if error %}
-                        <div class="notification is-danger is-light">
-                            {{ error }}
-                        </div>
-                    {% endif %}
-
-                    <form method="post">
-
-                        <div class="field">
-                            <label
-                                class="label"
-                                for="email"
-                            >
-                                Email
-                            </label>
-
-                            <div class="control">
-                                <input
-                                    class="input"
-                                    type="email"
-                                    id="email"
-                                    name="email"
-                                    required
-                                >
-                            </div>
-                        </div>
-
-                        <div class="field">
-                            <label
-                                class="label"
-                                for="password"
-                            >
-                                Password
-                            </label>
-
-                            <div class="control">
-                                <input
-                                    class="input"
-                                    type="password"
-                                    id="password"
-                                    name="password"
-                                    required
-                                >
-                            </div>
-                        </div>
-
-                        <div class="field mt-5">
-                            <div class="control">
-                                <button
-                                    type="submit"
-                                    class="button is-primary is-fullwidth"
-                                >
-                                    Create Account
-                                </button>
-                            </div>
-                        </div>
-
-                    </form>
-
-                    <div class="has-text-centered mt-5">
-                        <p>
-                            Already have an account?
-                            <a href="/login">
-                                Log in
-                            </a>
-                        </p>
-                    </div>
-
-                </div>
-
-            </div>
+        <div>
+            <label for="organization_name">Organization Name:</label>
+            <input
+                type="text"
+                id="organization_name"
+                name="organization_name"
+                value="{{ organization_name or '' }}"
+                required
+                autofocus
+            >
         </div>
 
-    </div>
-</section>
+        <br>
 
-{% endblock %}
+        <div>
+            <label for="email">Email:</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                value="{{ email or '' }}"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="password">Password:</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                required
+            >
+        </div>
+
+        <br>
+
+        <button type="submit">Create Account</button>
+
+    </form>
+
+    <p>
+        Already have an account?
+        <a href="/login">Log in</a>
+    </p>
+
+</body>
+</html>

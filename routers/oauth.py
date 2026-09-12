@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from poynt.token import exchange_authorization_code
 
+
 from dotenv import load_dotenv
 import os
 import secrets
@@ -20,25 +21,53 @@ from poynt.connection import (
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
 load_dotenv(dotenv_file)
 
+
 from logging_config import configure_logging
 
 import logging
 logger = logging.getLogger(__name__)
+configure_logging()
+
 
 POYNT_REDIRECT_URI = os.environ["POYNT_REDIRECT_URI"]
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 
+
 router = APIRouter()
 
 templates = Jinja2Templates(directory="templates")
 
+
+def log_oauth_session(request: Request, stage: str):
+    # Diagnostic logging only. Never log the session cookie value or OAuth context.
+    session_keys = sorted(request.session.keys())
+
+    logger.warning(
+        "OAUTH SESSION DEBUG [%s]: user_id=%s, session_keys=%s, "
+        "cookie_present=%s, host=%s, scheme=%s, path=%s",
+        stage,
+        request.session.get("user_id"),
+        session_keys,
+        "session" in request.cookies,
+        request.headers.get("host"),
+        request.url.scheme,
+        request.url.path,
+    )
+
+
 @router.get("/oauth/start")
 async def oauth_start(request: Request):
+
+    log_oauth_session(request, "START BEFORE CONTEXT")
 
     user_id = request.session.get("user_id")
 
     if not user_id:
+        logger.warning(
+            "OAUTH SESSION DEBUG [START NO USER]: session_keys=%s",
+            sorted(request.session.keys()),
+        )
         return RedirectResponse(
             "/login",
             status_code=303
@@ -49,6 +78,8 @@ async def oauth_start(request: Request):
 
     # Remember which Codelian session initiated this OAuth request
     request.session["poynt_oauth_context"] = context
+
+    log_oauth_session(request, "START AFTER CONTEXT")
 
     params = {
         "client_id": POYNT_APP_ID,
@@ -65,6 +96,7 @@ async def oauth_start(request: Request):
         status_code=303
     )
 
+
 @router.get("/oauth/callback", response_class=HTMLResponse)
 async def oauth_callback(
     request: Request,
@@ -73,9 +105,23 @@ async def oauth_callback(
     context: str | None = None,
     businessId: str | None = None,
 ):
+
+    log_oauth_session(request, "CALLBACK ENTRY")
+
     user_id = request.session.get("user_id")
 
     if not user_id:
+        logger.error(
+            "OAUTH SESSION DEBUG [CALLBACK NO USER]: "
+            "Poynt callback arrived without user_id. "
+            "session_keys=%s, query_has_code=%s, query_has_context=%s, "
+            "query_has_business_id=%s, status=%s",
+            sorted(request.session.keys()),
+            bool(code),
+            bool(context),
+            bool(businessId),
+            status,
+        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -88,12 +134,19 @@ async def oauth_callback(
             },
             status_code=401,
         )
-    
+
     expected_context = request.session.get(
         "poynt_oauth_context"
     )
 
     if not expected_context:
+        logger.error(
+            "OAUTH SESSION DEBUG [CALLBACK NO CONTEXT]: "
+            "user_id=%s but poynt_oauth_context is missing. "
+            "session_keys=%s",
+            user_id,
+            sorted(request.session.keys()),
+        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -111,6 +164,13 @@ async def oauth_callback(
         context,
         expected_context
     ):
+        logger.error(
+            "OAUTH SESSION DEBUG [CONTEXT MISMATCH]: user_id=%s, "
+            "context_received=%s, expected_context_present=%s",
+            user_id,
+            bool(context),
+            bool(expected_context),
+        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -217,7 +277,8 @@ async def oauth_callback(
         token_type=token_response.get("tokenType"),
         expires_at=expires_at,
     )
+
     return RedirectResponse(
         "/dashboard",
         status_code=303
-    )        
+    )
