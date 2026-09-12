@@ -95,6 +95,7 @@ async def register(
         session.commit()
 
         request.session["user_id"] = user.id
+        request.session["organization_id"] = organization.id
 
     return RedirectResponse(
         "/dashboard",
@@ -148,7 +149,24 @@ async def login(
                 status_code=401
             )
 
+        membership = session.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.user_id == user.id)
+            .order_by(OrganizationMember.id)
+        ).scalars().first()
+
+        if not membership:
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "error": "No organization is associated with this account."
+                },
+                status_code=403
+            )
+
         request.session["user_id"] = user.id
+        request.session["organization_id"] = membership.organization_id
 
     return RedirectResponse(
         "/dashboard",

@@ -11,10 +11,10 @@ from poynt.token import exchange_authorization_code
 from dotenv import load_dotenv
 import os
 import secrets
-from poynt.connection import (
-    get_poynt_connection,
-    get_poynt_credentials,
-    save_poynt_connection,
+from poynt.connection import save_poynt_connection
+from organization_context import (
+    get_current_organization_id,
+    user_belongs_to_organization,
 )
 
 
@@ -39,27 +39,8 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 
-def log_oauth_session(request: Request, stage: str):
-    # Diagnostic logging only. Never log the session cookie value or OAuth context.
-    session_keys = sorted(request.session.keys())
-
-    logger.warning(
-        "OAUTH SESSION DEBUG [%s]: user_id=%s, session_keys=%s, "
-        "cookie_present=%s, host=%s, scheme=%s, path=%s",
-        stage,
-        request.session.get("user_id"),
-        session_keys,
-        "session" in request.cookies,
-        request.headers.get("host"),
-        request.url.scheme,
-        request.url.path,
-    )
-
-
 @router.get("/oauth/start")
 async def oauth_start(request: Request):
-
-    log_oauth_session(request, "START BEFORE CONTEXT")
 
     user_id = request.session.get("user_id")
 
@@ -73,13 +54,28 @@ async def oauth_start(request: Request):
             status_code=303
         )
 
+    organization_id = get_current_organization_id(request)
+
+    if organization_id is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Organization Error",
+                "paragraphs": [
+                    "No organization is associated with this account."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=403,
+        )
+
     # Generate a random value that will come back from Poynt
     context = secrets.token_urlsafe(32)
 
-    # Remember which Codelian session initiated this OAuth request
+    # Bind this OAuth request to the current organization.
     request.session["poynt_oauth_context"] = context
-
-    log_oauth_session(request, "START AFTER CONTEXT")
+    request.session["poynt_oauth_organization_id"] = organization_id
 
     params = {
         "client_id": POYNT_APP_ID,
@@ -106,22 +102,9 @@ async def oauth_callback(
     businessId: str | None = None,
 ):
 
-    log_oauth_session(request, "CALLBACK ENTRY")
-
     user_id = request.session.get("user_id")
 
     if not user_id:
-        logger.error(
-            "OAUTH SESSION DEBUG [CALLBACK NO USER]: "
-            "Poynt callback arrived without user_id. "
-            "session_keys=%s, query_has_code=%s, query_has_context=%s, "
-            "query_has_business_id=%s, status=%s",
-            sorted(request.session.keys()),
-            bool(code),
-            bool(context),
-            bool(businessId),
-            status,
-        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -138,15 +121,32 @@ async def oauth_callback(
     expected_context = request.session.get(
         "poynt_oauth_context"
     )
+    organization_id = request.session.get("poynt_oauth_organization_id")
+
+    if organization_id is not None:
+        try:
+            organization_id = int(organization_id)
+        except (TypeError, ValueError):
+            organization_id = None
+
+    if organization_id is None or not user_belongs_to_organization(
+        user_id,
+        organization_id,
+    ):
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "OAuth Error",
+                "paragraphs": [
+                    "The organization associated with this authorization request could not be verified."
+                ],
+                "show_dashboard_link": False,
+            },
+            status_code=403,
+        )
 
     if not expected_context:
-        logger.error(
-            "OAUTH SESSION DEBUG [CALLBACK NO CONTEXT]: "
-            "user_id=%s but poynt_oauth_context is missing. "
-            "session_keys=%s",
-            user_id,
-            sorted(request.session.keys()),
-        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -164,13 +164,6 @@ async def oauth_callback(
         context,
         expected_context
     ):
-        logger.error(
-            "OAUTH SESSION DEBUG [CONTEXT MISMATCH]: user_id=%s, "
-            "context_received=%s, expected_context_present=%s",
-            user_id,
-            bool(context),
-            bool(expected_context),
-        )
         return templates.TemplateResponse(
             request=request,
             name="message.html",
@@ -216,6 +209,7 @@ async def oauth_callback(
     # OAuth response is valid.
     # Consume the context so it cannot be reused.
     request.session.pop("poynt_oauth_context", None)
+    request.session.pop("poynt_oauth_organization_id", None)
 
     try:
         token_response = await exchange_authorization_code(
@@ -270,7 +264,7 @@ async def oauth_callback(
         )
 
     save_poynt_connection(
-        user_id=user_id,
+        organization_id=organization_id,
         business_id=businessId,
         access_token=access_token,
         refresh_token=token_response.get("refreshToken"),

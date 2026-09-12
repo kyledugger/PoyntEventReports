@@ -18,29 +18,29 @@ class PoyntCredentials:
     expires_at: datetime | None
 
 
-def get_poynt_connection(user_id: int) -> PoyntConnection | None:
+def get_poynt_connection(organization_id: int) -> PoyntConnection | None:
     """
-    Return the Poynt connection belonging to a Codelian user.
+    Return the Poynt connection belonging to an organization.
 
-    Returns None if the user has not connected Poynt.
+    Returns None if the organization has not connected Poynt.
     """
 
     with SessionLocal() as session:
         return session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id
+            PoyntConnection.organization_id == organization_id
         ).one_or_none()
 
 
 def get_poynt_credentials(
-    user_id: int
+    organization_id: int
 ) -> PoyntCredentials | None:
     """
-    Retrieve the Poynt credentials associated with a Codelian user.
+    Retrieve the Poynt credentials associated with an organization.
 
-    Returns None if the user has not connected Poynt.
+    Returns None if the organization has not connected Poynt.
     """
 
-    connection = get_poynt_connection(user_id)
+    connection = get_poynt_connection(organization_id)
 
     if not connection:
         return None
@@ -55,7 +55,7 @@ def get_poynt_credentials(
 
 
 def save_poynt_connection(
-    user_id: int,
+    organization_id: int,
     business_id: str,
     access_token: str,
     refresh_token: str | None,
@@ -63,13 +63,13 @@ def save_poynt_connection(
     expires_at: datetime | None,
 ) -> None:
     """
-    Create or update the Poynt connection for a Codelian user.
+    Create or update the Poynt connection for an organization.
     """
 
     with SessionLocal() as session:
 
         connection = session.query(PoyntConnection).filter(
-            PoyntConnection.user_id == user_id
+            PoyntConnection.organization_id == organization_id
         ).one_or_none()
 
         if connection:
@@ -79,13 +79,13 @@ def save_poynt_connection(
             connection.token_type = token_type
             connection.expires_at = expires_at
             logger.info(
-                "Updated existing Poynt connection for user_id=%d",
-                user_id,
-                )
+                "Updated existing Poynt connection for organization_id=%d",
+                organization_id,
+            )
 
         else:
             connection = PoyntConnection(
-                user_id=user_id,
+                organization_id=organization_id,
                 business_id=business_id,
                 access_token=access_token,
                 refresh_token=refresh_token,
@@ -93,9 +93,9 @@ def save_poynt_connection(
                 expires_at=expires_at,
             )
             logger.info(
-                "Created new Poynt connection for user_id=%d",
-                user_id,
-                )
+                "Created new Poynt connection for organization_id=%d",
+                organization_id,
+            )
 
             session.add(connection)
 

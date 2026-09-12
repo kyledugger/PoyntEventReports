@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
 from models import User
+from organization_context import get_current_organization_id
 from poynt.connection import (
     get_poynt_connection
 )
@@ -92,7 +93,16 @@ async def dashboard(request: Request):
                 status_code=303
             )
 
-    poynt_connection = get_poynt_connection(user_id)
+    organization_id = get_current_organization_id(request)
+
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse(
+            "/login",
+            status_code=303
+        )
+
+    poynt_connection = get_poynt_connection(organization_id)
 
     return templates.TemplateResponse(
         request=request,

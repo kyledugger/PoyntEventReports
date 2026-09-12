@@ -33,12 +33,6 @@ class User(Base):
         nullable=False
     )
 
-    poynt_connection: Mapped["PoyntConnection | None"] = relationship(
-        back_populates="user",
-        uselist=False,
-        cascade="all, delete-orphan"
-    )
-
     organization_memberships: Mapped[list["OrganizationMember"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"
@@ -70,6 +64,12 @@ class Organization(Base):
 
     members: Mapped[list["OrganizationMember"]] = relationship(
         back_populates="organization",
+        cascade="all, delete-orphan"
+    )
+
+    poynt_connection: Mapped["PoyntConnection | None"] = relationship(
+        back_populates="organization",
+        uselist=False,
         cascade="all, delete-orphan"
     )
 
@@ -117,8 +117,8 @@ class PoyntConnection(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id"),
         unique=True,
         nullable=False,
         index=True
@@ -162,6 +162,6 @@ class PoyntConnection(Base):
         nullable=False
     )
 
-    user: Mapped["User"] = relationship(
+    organization: Mapped["Organization"] = relationship(
         back_populates="poynt_connection"
     )
