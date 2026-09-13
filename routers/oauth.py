@@ -55,6 +55,11 @@ async def oauth_start(request: Request):
         )
 
     organization_id = get_current_organization_id(request)
+    logger.info(
+        "Poynt orders context: user_id=%s, organization_id=%s",
+        user_id,
+        organization_id,
+    )    
 
     if organization_id is None:
         return templates.TemplateResponse(

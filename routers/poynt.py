@@ -76,7 +76,9 @@ async def poynt_catalog(request: Request):
         client = PoyntClient(
             credentials,
             user_id=user_id,
+            organization_id=organization_id,
         )
+
 
         catalogs = await client.get_catalogs()
 
@@ -684,12 +686,14 @@ def get_orders_date_range(start, end):
 async def fetch_poynt_orders(
     credentials,
     user_id,
+    organization_id,
     start_at,
     end_at,
 ):
     client = PoyntClient(
         credentials,
         user_id=user_id,
+        organization_id=organization_id,
     )
 
     return await client.get_recent_orders(
@@ -1091,6 +1095,11 @@ async def poynt_orders(
 
     credentials = get_poynt_credentials(organization_id)
 
+    logger.info(
+        "Poynt orders credentials: found=%s",
+        credentials is not None,
+    )       
+
     if not credentials:
         return templates.TemplateResponse(
             request=request,
@@ -1109,6 +1118,7 @@ async def poynt_orders(
         orders = await fetch_poynt_orders(
             credentials,
             user_id,
+            organization_id,
             start_at,
             end_at,
         )
@@ -1441,6 +1451,7 @@ async def poynt_stores(
         client = PoyntClient(
             credentials,
             user_id=user_id,
+            organization_id=organization_id,
         )
 
         businesses = await client.get_stores()
