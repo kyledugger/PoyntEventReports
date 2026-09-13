@@ -1123,6 +1123,39 @@ async def poynt_orders(
             end_at,
         )
 
+        if not orders:
+            logger.info(
+                "No Poynt orders found for requested date range: %s - %s",
+                start_at,
+                end_at,
+            )
+
+            return templates.TemplateResponse(
+                request=request,
+                name="orders.html",
+                context={
+                    "report_generated": False,
+                    "validation_title": "No Orders Found",
+                    "validation_message": (
+                        "No orders were found for the selected date range."
+                    ),
+                    "start_input_value": start,
+                    "end_input_value": end,
+                    "available_stores": [],
+                    "selected_stores": [],
+                    "chart_data_json": "[]",
+                    "item_flow_json": "[]",
+                    "revenue_flow_json": "[]",
+
+                    # Tip Calculator defaults
+                    "tip_calculator_data": [],
+                    "tip_calculator_enabled": False,
+                    "tip_calculator_store_name": "",
+                    "start_at_for_tip_calculator": None,
+                    "end_at_for_tip_calculator": None,
+                },
+            )
+        
         available_store_ids = get_available_store_ids(orders)
 
         if not available_store_ids:
