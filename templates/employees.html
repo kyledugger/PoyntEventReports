@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="section">
+    <div class="container">
+
+        <div class="level mb-5">
+            <div class="level-left">
+                <div>
+                    <h1 class="title mb-1">Employees</h1>
+                    <p class="subtitle is-6">
+                        Manage employees for your organization.
+                    </p>
+                </div>
+            </div>
+
+            <div class="level-right">
+                <a href="/employees/new" class="button is-primary">
+                    Add Employee
+                </a>
+            </div>
+        </div>
+
+        <div class="tabs is-boxed mb-5">
+            <ul>
+                <li class="{% if status == 'active' %}is-active{% endif %}">
+                    <a href="/employees?status=active">
+                        Active
+                    </a>
+                </li>
+
+                <li class="{% if status == 'all' %}is-active{% endif %}">
+                    <a href="/employees?status=all">
+                        All
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        {% if employees %}
+
+        <div class="table-container">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for employee in employees %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {{ employee.first_name }}
+                                {{ employee.last_name }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ employee.email }}
+                        </td>
+
+                        <td>
+                            {{ employee.role | title }}
+                        </td>
+
+                        <td>
+                            {% if employee.is_active %}
+                                <span class="tag is-success is-light">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="tag is-light">
+                                    Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="has-text-right">
+                            <a
+                                href="/employees/{{ employee.id }}/edit"
+                                class="button is-small"
+                            >
+                                Edit
+                            </a>
+                        </td>
+                        {% if employee.is_active %}
+                        <td class="has-text-right">
+                            <form
+                                method="post"
+                                action="/employees/{{ employee.id }}/invite"
+                                style="display: inline;"
+                            >
+                                <button
+                                    type="submit"
+                                    class="button is-small is-primary"
+                                >
+                                    Invite
+                                </button>
+                            </form>
+                        </td>        
+                        {% endif %}                        
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+{% else %}
+
+    <div class="notification is-light">
+        {% if status == "active" %}
+            <strong>No active employees.</strong>
+            <br>
+            There are currently no active employees in your organization.
+        {% else %}
+            <strong>No employees.</strong>
+            <br>
+            There are currently no employees in your organization.
+        {% endif %}
+    </div>
+
+{% endif %}
+
+    </div>
+</section>
+
+{% endblock %}

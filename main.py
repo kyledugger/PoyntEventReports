@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
@@ -14,6 +15,7 @@ from poynt.connection import (
 from routers.auth_routes import router as auth_router
 from routers.oauth import router as oauth_router
 from routers.poynt import router as poynt_router
+from routers.employees import router as employees_router
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
 load_dotenv(dotenv_file)
@@ -47,9 +49,13 @@ POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 
 app = FastAPI(title="Codelian Poynt")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(poynt_router)
+app.include_router(employees_router)
 
 Base.metadata.create_all(bind=engine)
 

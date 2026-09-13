@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="section">
+    <div class="container" style="max-width: 700px;">
+
+        <div class="mb-5">
+            <h1 class="title mb-1">Add Employee</h1>
+            <p class="subtitle is-6">
+                Enter the employee's official information.
+            </p>
+        </div>
+
+        {% if error %}
+        <div class="notification is-danger is-light">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/employees">
+
+            <div class="field">
+                <label class="label" for="first_name">
+                    First Name
+                </label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="text"
+                        id="first_name"
+                        name="first_name"
+                        value="{{ first_name }}"
+                        maxlength="100"
+                        required
+                        autofocus
+                    >
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label" for="last_name">
+                    Last Name
+                </label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="text"
+                        id="last_name"
+                        name="last_name"
+                        value="{{ last_name }}"
+                        maxlength="100"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label" for="email">
+                    Email Address
+                </label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="email"
+                        id="email"
+                        name="email"
+                        value="{{ email }}"
+                        maxlength="320"
+                        required
+                    >
+                </div>
+
+                <p class="help">
+                    This will be used later to send the employee's
+                    account invitation.
+                </p>
+            </div>
+
+            <div class="field is-grouped mt-5">
+                <div class="control">
+                    <button type="submit" class="button is-primary">
+                        Add Employee
+                    </button>
+                </div>
+
+                <div class="control">
+                    <a href="/employees" class="button is-light">
+                        Cancel
+                    </a>
+                </div>
+            </div>
+
+        </form>
+
+    </div>
+</section>
+
+{% endblock %}

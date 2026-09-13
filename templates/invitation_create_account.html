@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="section">
+    <div class="container" style="max-width: 700px;">
+
+        <div class="mb-5">
+            <h1 class="title mb-2">Create Your Account</h1>
+
+            <p class="subtitle is-6">
+                You're joining
+                <strong>{{ organization.name }}</strong>.
+            </p>
+        </div>
+
+        <div class="box">
+
+            <div class="mb-5">
+                <p class="has-text-grey mb-2">
+                    Employee
+                </p>
+
+                <p class="title is-4 mb-2">
+                    {{ employee.first_name }}
+                    {{ employee.last_name }}
+                </p>
+
+                <p>
+                    {{ employee.email }}
+                </p>
+            </div>
+
+            <div class="notification is-light mb-5">
+                Your name and email address are managed by your
+                organization and cannot be changed here.
+            </div>
+
+            {% if error %}
+            <div class="notification is-danger is-light">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form
+                method="post"
+                action="/invite/{{ token }}/create-account"
+            >
+
+                <div class="field">
+                    <label class="label" for="password">
+                        Password
+                    </label>
+
+                    <div class="control">
+                        <input
+                            class="input"
+                            id="password"
+                            name="password"
+                            type="password"
+                            required
+                            autocomplete="new-password"
+                        >
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="confirm_password">
+                        Confirm Password
+                    </label>
+
+                    <div class="control">
+                        <input
+                            class="input"
+                            id="confirm_password"
+                            name="confirm_password"
+                            type="password"
+                            required
+                            autocomplete="new-password"
+                        >
+                    </div>
+                </div>
+
+                <div class="buttons mt-5">
+                    <button
+                        type="submit"
+                        class="button is-primary"
+                    >
+                        Create Account
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+</section>
+
+{% endblock %}

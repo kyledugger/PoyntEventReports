@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="section">
+    <div class="container" style="max-width: 700px;">
+
+        <div class="mb-5">
+            <h1 class="title mb-1">Edit Employee</h1>
+            <p class="subtitle is-6">
+                Update the employee's official information.
+            </p>
+        </div>
+
+        {% if error %}
+        <div class="notification is-danger is-light">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form
+            method="post"
+            action="/employees/{{ employee.id }}"
+        >
+
+            <div class="field">
+                <label class="label">First Name</label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="text"
+                        name="first_name"
+                        value="{{ employee.first_name }}"
+                        maxlength="100"
+                        required
+                        autofocus
+                    >
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label">Last Name</label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="text"
+                        name="last_name"
+                        value="{{ employee.last_name }}"
+                        maxlength="100"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="label">Email Address</label>
+
+                <div class="control">
+                    <input
+                        class="input"
+                        type="email"
+                        name="email"
+                        value="{{ employee.email }}"
+                        maxlength="320"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="field mt-5">
+                <label class="checkbox">
+                    <input
+                        type="checkbox"
+                        name="is_active"
+                        {% if employee.is_active %}checked{% endif %}
+                    >
+                    Active Employee
+                </label>
+
+                <p class="help">
+                    Inactive employees remain in historical records
+                    but will not be available for new assignments.
+                </p>
+            </div>
+
+            <div class="field is-grouped mt-5">
+                <div class="control">
+                    <button
+                        type="submit"
+                        class="button is-primary"
+                    >
+                        Save Changes
+                    </button>
+                </div>
+
+                <div class="control">
+                    <a
+                        href="/employees"
+                        class="button is-light"
+                    >
+                        Cancel
+                    </a>
+                </div>
+            </div>
+
+        </form>
+
+    </div>
+</section>
+
+{% endblock %}

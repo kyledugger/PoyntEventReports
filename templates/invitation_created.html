@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<section class="section">
+    <div class="container" style="max-width: 800px;">
+
+        <div class="mb-5">
+            <h1 class="title mb-2">Invitation Created</h1>
+
+            <p class="subtitle is-6">
+                An account invitation has been created for
+                <strong>
+                    {{ employee.first_name }} {{ employee.last_name }}
+                </strong>.
+            </p>
+        </div>
+
+        <div class="notification is-success is-light">
+            The invitation is valid for 7 days.
+        </div>
+
+        <div class="field">
+            <label class="label">Invitation Link</label>
+
+            <div class="field has-addons">
+                <div class="control is-expanded">
+                    <input
+                        id="invitation-link"
+                        class="input"
+                        type="text"
+                        value="{{ invitation_url }}"
+                        readonly
+                    >
+                </div>
+
+                <div class="control">
+                    <button
+                        type="button"
+                        class="button is-primary"
+                        onclick="copyInvitationLink()"
+                    >
+                        Copy Link
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <p class="help mb-5">
+            Send this link to {{ employee.first_name }}.
+            Anyone with the link can use it, so treat it like a password
+            until the invitation has been accepted.
+        </p>
+
+        <div class="content">
+            <p>
+                <strong>Employee:</strong>
+                {{ employee.first_name }} {{ employee.last_name }}
+            </p>
+
+            <p>
+                <strong>Email:</strong>
+                {{ employee.email }}
+            </p>
+
+            <p>
+                <strong>Expires:</strong>
+                {{ expires_at.strftime("%B %d, %Y at %I:%M %p") }}            
+            </p>
+        </div>
+
+        <div class="buttons mt-5">
+            <a href="/employees" class="button is-light">
+                Back to Employees
+            </a>
+        </div>
+
+    </div>
+</section>
+
+<script>
+function copyInvitationLink() {
+    const input = document.getElementById("invitation-link");
+
+    navigator.clipboard.writeText(input.value).then(() => {
+        const button = event.currentTarget;
+        const originalText = button.textContent;
+
+        button.textContent = "Copied!";
+
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 1500);
+    });
+}
+</script>
+
+{% endblock %}
