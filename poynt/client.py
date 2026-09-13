@@ -27,8 +27,10 @@ class PoyntClient:
     def __init__(
         self,
         credentials: PoyntCredentials,
+        organization_id: int,
         user_id: int,
     ):
+        self.organization_id = organization_id
         self.user_id = user_id
         self.business_id = credentials.business_id
         self.access_token = credentials.access_token
@@ -190,6 +192,7 @@ class PoyntClient:
         # Then persist the complete new credential set.
         save_poynt_connection(
             user_id=self.user_id,
+            organization_id=self.organization_id,
             business_id=self.business_id,
             access_token=self.access_token,
             refresh_token=self.refresh_token,
