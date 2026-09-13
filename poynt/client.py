@@ -191,7 +191,6 @@ class PoyntClient:
 
         # Then persist the complete new credential set.
         save_poynt_connection(
-            user_id=self.user_id,
             organization_id=self.organization_id,
             business_id=self.business_id,
             access_token=self.access_token,
