@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="level mb-5">
+            <div class="level-left">
+                <div>
+                    <h1 class="title">Tip Submission Report</h1>
+                    <p class="subtitle is-6">Today's submitted tip ranges</p>
+                </div>
+            </div>
+            <div class="level-right">
+                <a href="/poynt/orders" class="button is-primary">Back to Orders Report</a>
+            </div>
+        </div>
+
+        {% if submissions %}
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable">
+                    <thead>
+                        <tr>
+                            <th>Tip Range</th>
+                            <th>Tips</th>
+                            <th>Payment</th>
+                            <th>Submitted</th>
+                            <th>Employees</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for submission in submissions %}
+                            <tr>
+                                <td>
+                                    <div class="mb-2">
+                                        <strong>{{ submission.store_name }}</strong>
+                                    </div>
+                                    {% for tip_range in submission.ranges %}
+                                        <div class="mb-3">
+                                            <strong>
+                                                <span class="tip-report-time" data-value="{{ tip_range.start }}"></span>
+                                                →
+                                                <span class="tip-report-time" data-value="{{ tip_range.end }}"></span>
+                                            </strong>
+                                            <br>
+                                            <span class="has-text-grey is-size-7">
+                                                ${{ "%.2f"|format(tip_range.total_tip_cents / 100) }}
+                                                •
+                                                {{ tip_range.employees | map(attribute="name") | join(", ") }}
+                                            </span>
+                                        </div>
+                                    {% endfor %}
+                                    <div class="mt-2 pt-2" style="border-top: 1px solid #363b45;">
+                                        <strong>Total: ${{ "%.2f"|format(submission.total_tip_cents / 100) }}</strong>
+                                    </div>
+                                </td>
+                                <td><strong>${{ "%.2f"|format(submission.total_tip_cents / 100) }}</strong></td>
+                                <td>
+                                    {% if submission.payout_method == "paycheck" %}
+                                        Put on paycheck
+                                    {% else %}
+                                        Cash out
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="tip-report-time" data-value="{{ submission.submitted_at }}"></span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="notification is-light">
+                No tip submissions have been recorded today.
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll(".tip-report-time").forEach(function(element) {
+        const value = element.dataset.value;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            element.textContent = value;
+            return;
+        }
+
+        element.textContent = new Intl.DateTimeFormat(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+        }).format(date);
+    });
+</script>
+{% endblock %}

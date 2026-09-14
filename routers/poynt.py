@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 import os
 from database import SessionLocal
 from models import Employee
+from tip_submission_model import TipSubmission
 from poynt.connection import get_poynt_credentials
 from organization_context import get_current_organization_id
 
@@ -1046,6 +1047,150 @@ def get_stores_display(store_ids):
     return stores_display
 
 
+
+def _parse_tip_submission_datetime(value: str) -> datetime:
+    """Parse an ISO timestamp and normalize it to a naive UTC datetime."""
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    return parsed
+
+
+def _get_today_utc_bounds() -> tuple[datetime, datetime]:
+    """Return today's Phoenix calendar day as naive UTC database bounds."""
+    phoenix = ZoneInfo("America/Phoenix")
+    utc = ZoneInfo("UTC")
+    today = datetime.now(phoenix).date()
+    start_local = datetime.combine(today, datetime.min.time(), tzinfo=phoenix)
+    end_local = start_local + timedelta(days=1)
+    return (
+        start_local.astimezone(utc).replace(tzinfo=None),
+        end_local.astimezone(utc).replace(tzinfo=None),
+    )
+
+
+def _tip_submission_display(submission: TipSubmission) -> dict:
+    try:
+        data = json.loads(submission.submission_data)
+    except (TypeError, ValueError):
+        data = {}
+
+    return {
+        "id": submission.id,
+        "store_name": submission.store_name,
+        "report_start_at": submission.report_start_at.isoformat(),
+        "report_end_at": submission.report_end_at.isoformat(),
+        "total_tip_cents": submission.total_tip_cents,
+        "payout_method": submission.payout_method,
+        "submitted_at": submission.submitted_at.isoformat(),
+        "ranges": data.get("ranges", []),
+        "employee_names": [
+            employee.get("name", "Unknown Employee")
+            for tip_range in data.get("ranges", [])
+            if isinstance(tip_range, dict)
+            for employee in (tip_range.get("employees") or [])
+            if isinstance(employee, dict)
+        ],
+    }
+
+
+@router.get("/poynt/tip-submissions", response_class=HTMLResponse)
+async def tip_submission_report(request: Request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    organization_id = get_current_organization_id(request)
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+
+    day_start, day_end = _get_today_utc_bounds()
+
+    with SessionLocal() as session:
+        submissions = session.execute(
+            select(TipSubmission)
+            .where(
+                TipSubmission.organization_id == organization_id,
+                TipSubmission.submitted_at >= day_start,
+                TipSubmission.submitted_at < day_end,
+            )
+            .order_by(TipSubmission.submitted_at.desc(), TipSubmission.id.desc())
+        ).scalars().all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="tip_submissions.html",
+        context={
+            "submissions": [_tip_submission_display(item) for item in submissions],
+        },
+    )
+
+
+@router.post("/poynt/tip-submissions")
+async def submit_tip_record(
+    request: Request,
+    store_id: str = Form(...),
+    store_name: str = Form(...),
+    report_start_at: str = Form(...),
+    report_end_at: str = Form(...),
+    total_tip_cents: int = Form(...),
+    payout_method: str = Form(...),
+    submission_json: str = Form(...),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    organization_id = get_current_organization_id(request)
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+
+    if payout_method not in {"cash", "paycheck"}:
+        return RedirectResponse("/poynt/orders", status_code=303)
+
+    try:
+        report_start = _parse_tip_submission_datetime(report_start_at)
+        report_end = _parse_tip_submission_datetime(report_end_at)
+        submission_data = json.loads(submission_json)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return RedirectResponse("/poynt/orders", status_code=303)
+
+    if report_start >= report_end:
+        return RedirectResponse("/poynt/orders", status_code=303)
+
+    if not isinstance(submission_data, dict) or not isinstance(
+        submission_data.get("ranges"), list
+    ) or not submission_data.get("ranges"):
+        return RedirectResponse("/poynt/orders", status_code=303)
+
+    if len(submission_data["ranges"]) > 6:
+        return RedirectResponse("/poynt/orders", status_code=303)
+
+    for tip_range in submission_data["ranges"]:
+        if not isinstance(tip_range, dict):
+            return RedirectResponse("/poynt/orders", status_code=303)
+        if not isinstance(tip_range.get("employees"), list) or not tip_range["employees"]:
+            return RedirectResponse("/poynt/orders", status_code=303)
+
+    with SessionLocal() as session:
+        submission = TipSubmission(
+            organization_id=organization_id,
+            submitted_by_user_id=user_id,
+            store_id=store_id,
+            store_name=store_name,
+            report_start_at=report_start,
+            report_end_at=report_end,
+            total_tip_cents=max(0, int(total_tip_cents)),
+            payout_method=payout_method,
+            submission_data=json.dumps(submission_data),
+        )
+        session.add(submission)
+        session.commit()
+
+    return RedirectResponse("/poynt/tip-submissions", status_code=303)
+
 @router.get("/poynt/orders", response_class=HTMLResponse)
 async def poynt_orders(
     request: Request,
@@ -1090,6 +1235,7 @@ async def poynt_orders(
                 "tip_calculator_data": [],
                 "tip_calculator_enabled": False,
                 "tip_calculator_store_name": "",
+                "tip_calculator_store_id": "",
                 "start_at_for_tip_calculator": None,
                 "end_at_for_tip_calculator": None,
             },
@@ -1479,7 +1625,8 @@ async def poynt_orders(
             "tip_calculator_data": tip_calculator_data,
             "tip_calculator_employees": tip_calculator_employees,
             "tip_calculator_enabled": tip_calculator_enabled,
-            "tip_calculator_store_name": tip_calculator_store_name,      
+            "tip_calculator_store_name": tip_calculator_store_name,
+            "tip_calculator_store_id": next(iter(store_ids), "") if len(store_ids) == 1 else "",
             "tip_calculator_disabled_reason": tip_calculator_disabled_reason,
             "start_at_for_tip_calculator": start_at,
             "end_at_for_tip_calculator": end_at,                  

@@ -356,7 +356,7 @@
         display: grid;
         grid-template-columns:
             minmax(430px, 1fr)
-            minmax(420px, 1fr)
+            minmax(280px, 1fr)
             110px
             125px
             75px;
@@ -404,22 +404,16 @@
     /* Employee selectors */
     .tip-employees-control {
         display: flex;
-        align-items: left;
+        align-items: center;
         flex-wrap: wrap;
         gap: 0.35rem;
     }
 
     .tip-employee-selector {
         display: flex;
-        align-items: left;
+        align-items: center;
         gap: 0.2rem;
     }
-
-    .tip-employee-add-button {
-        display: flex;
-        align-items: left;
-        gap: 0.2rem;
-    }    
 
     .tip-employee-selector .select {
         width: 9rem;
@@ -743,6 +737,12 @@
                     >
                         Tip Calculator
                     </button>
+                    <a
+                        href="/poynt/tip-submissions"
+                        class="button is-small is-light ml-2"
+                    >
+                        Tip Submission Report
+                    </a>
                      </div>
 
 
@@ -1051,9 +1051,39 @@
                 Add Time Range
             </button>
 
+            <div class="field mt-5">
+                <label class="label">Tips</label>
+                <div class="control">
+                    <label class="radio mr-4">
+                        <input
+                            type="radio"
+                            name="tip-payout-method"
+                            value="cash"
+                            checked
+                        >
+                        Cash out
+                    </label>
+                    <label class="radio">
+                        <input
+                            type="radio"
+                            name="tip-payout-method"
+                            value="paycheck"
+                        >
+                        Put on paycheck
+                    </label>
+                </div>
+            </div>
+
         </section>
 
         <footer class="modal-card-foot is-justify-content-flex-end">
+            <button
+                type="button"
+                id="tip-calculator-submit"
+                class="button is-success mr-2"
+            >
+                Submit Tips
+            </button>
             <button
                 type="button"
                 id="tip-calculator-done"
@@ -1658,6 +1688,12 @@
         const tipCalculatorEnd =
             {{ end_at_for_tip_calculator | tojson }};
 
+        const tipCalculatorStoreId =
+            {{ tip_calculator_store_id | default("") | tojson }};
+
+        const tipCalculatorStoreName =
+            {{ tip_calculator_store_name | default("") | tojson }};
+
         const tipCalculatorModal =
             document.getElementById("tip-calculator-modal");
 
@@ -1672,6 +1708,9 @@
 
         const tipCalculatorDone =
             document.getElementById("tip-calculator-done");
+
+        const tipCalculatorSubmit =
+            document.getElementById("tip-calculator-submit");
 
         const tipCalculatorAdd =
             document.getElementById("tip-calculator-add");
@@ -1857,7 +1896,6 @@
 
                     <div class="tip-employees-control">
                         ${employeeSelectors}
-                        <div class="tip-employee-add-button">
                         <button
                             type="button"
                             class="button is-small is-link is-light tip-employee-add"
@@ -1866,7 +1904,7 @@
                         >
                             + Add Employee
                         </button>
-                        </div>
+                    </div>
 
                     </div>
 
@@ -2263,6 +2301,89 @@
 
 
         /* ---------------------------------------------------------
+        Tip submission
+        --------------------------------------------------------- */
+
+        function getTipSubmissionPayload() {
+            const ranges = tipRows.map(function(row, index) {
+                const totalCents = calculateRowTips(row, index);
+                const employees = row.employeeIds.map(function(employeeId) {
+                    const employee = tipCalculatorEmployees.find(function(item) {
+                        return item.id === employeeId;
+                    });
+                    return {
+                        id: employeeId,
+                        name: employee ? employee.name : "Unknown Employee"
+                    };
+                });
+
+                return {
+                    start: row.start.toISOString(),
+                    end: row.end.toISOString(),
+                    total_tip_cents: totalCents,
+                    per_employee_cents: Math.floor(
+                        totalCents / Math.max(1, employees.length)
+                    ),
+                    employees: employees
+                };
+            });
+
+            return {
+                report_start_at: new Date(tipCalculatorStart).toISOString(),
+                report_end_at: new Date(tipCalculatorEnd).toISOString(),
+                ranges: ranges
+            };
+        }
+
+        async function submitTipRecord() {
+            if (!tipCalculatorEnabled || !tipRows.length) {
+                return;
+            }
+
+            const payload = getTipSubmissionPayload();
+            const totalTipCents = tipRows.reduce(function(total, row, index) {
+                return total + calculateRowTips(row, index);
+            }, 0);
+
+            const payoutMethodElement = document.querySelector(
+                'input[name="tip-payout-method"]:checked'
+            );
+            const payoutMethod = payoutMethodElement
+                ? payoutMethodElement.value
+                : "cash";
+
+            const formData = new FormData();
+            formData.append("store_id", tipCalculatorStoreId);
+            formData.append("store_name", tipCalculatorStoreName);
+            formData.append("report_start_at", payload.report_start_at);
+            formData.append("report_end_at", payload.report_end_at);
+            formData.append("total_tip_cents", String(totalTipCents));
+            formData.append("payout_method", payoutMethod);
+            formData.append("submission_json", JSON.stringify(payload));
+
+            tipCalculatorSubmit.disabled = true;
+            tipCalculatorSubmit.textContent = "Submitting...";
+
+            try {
+                const response = await fetch("/poynt/tip-submissions", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error("Tip submission failed");
+                }
+
+                window.location.href = "/poynt/tip-submissions";
+            } catch (error) {
+                console.error(error);
+                tipCalculatorSubmit.disabled = false;
+                tipCalculatorSubmit.textContent = "Submit Tips";
+                alert("The tip submission could not be saved. Please try again.");
+            }
+        }
+
+        /* ---------------------------------------------------------
         Modal
         --------------------------------------------------------- */
 
@@ -2302,6 +2423,13 @@
             tipCalculatorDone.addEventListener(
                 "click",
                 closeTipCalculator
+            );
+        }
+
+        if (tipCalculatorSubmit) {
+            tipCalculatorSubmit.addEventListener(
+                "click",
+                submitTipRecord
             );
         }
 
