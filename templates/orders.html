@@ -356,13 +356,13 @@
         display: grid;
         grid-template-columns:
             minmax(430px, 1fr)
-            145px
+            minmax(420px, 1fr)
             110px
             125px
             75px;
         gap: 0.75rem;
         align-items: center;
-        min-width: 900px;
+        min-width: 1035px;
     }
 
     .tip-calculator-header {
@@ -401,25 +401,32 @@
         text-align: center;
     }
 
-    /* Employee +/- controls */
+    /* Employee selectors */
     .tip-employees-control {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: left;
+        flex-wrap: wrap;
+        gap: 0.35rem;
     }
 
-    .tip-employees-control .button {
-        width: 2.2rem;
-        min-width: 2.2rem;
-        padding-left: 0;
-        padding-right: 0;
+    .tip-employee-selector {
+        display: flex;
+        align-items: left;
+        gap: 0.2rem;
     }
 
-    .tip-employee-count {
-        width: 3.25rem;
-        text-align: center;
-        border-radius: 0;
-        margin: 0;
+    .tip-employee-add-button {
+        display: flex;
+        align-items: left;
+        gap: 0.2rem;
+    }    
+
+    .tip-employee-selector .select {
+        width: 9rem;
+    }
+
+    .tip-employee-select {
+        width: 100%;
     }
 
     /* Money */
@@ -731,7 +738,7 @@
                         class="button is-small is-primary"
                         {% if not tip_calculator_enabled %}disabled{% endif %}
                         {% if not tip_calculator_enabled %}
-                            title="Tip Calculator requires exactly one store in the report."
+                            title="{{ tip_calculator_disabled_reason | default('Tip Calculator is unavailable.') }}"
                         {% endif %}
                     >
                         Tip Calculator
@@ -1639,6 +1646,9 @@
         const tipCalculatorData =
             {{ tip_calculator_data | default([]) | tojson }};
 
+        const tipCalculatorEmployees =
+            {{ tip_calculator_employees | default([]) | tojson }};
+
         const tipCalculatorEnabled =
             {{ "true" if tip_calculator_enabled else "false" }};
 
@@ -1719,6 +1729,21 @@
             ).format(cents / 100);
         }
 
+        function escapeHtml(value) {
+            return String(value).replace(
+                /[&<>"']/g,
+                function(character) {
+                    return {
+                        "&": "&amp;",
+                        "<": "&lt;",
+                        ">": "&gt;",
+                        '"': "&quot;",
+                        "'": "&#39;"
+                    }[character];
+                }
+            );
+        }
+
 
         /* ---------------------------------------------------------
         Build / render
@@ -1737,7 +1762,7 @@
                 {
                     start: start,
                     end: end,
-                    employees: 1
+                    employeeIds: [tipCalculatorEmployees[0].id]
                 }
             ];
 
@@ -1754,7 +1779,56 @@
                 rowElement.className = "tip-row";
 
                 const isFirstRow = index === 0;
-                const isLastRow = index === tipRows.length - 1;
+                const employeeSelectors = row.employeeIds.map(
+                    function(employeeId, employeeIndex) {
+                        const options = tipCalculatorEmployees.map(
+                            function(employee) {
+                                const isSelected = employee.id === employeeId;
+                                const isSelectedElsewhere =
+                                    row.employeeIds.includes(employee.id)
+                                    && !isSelected;
+
+                                return `
+                                    <option
+                                        value="${employee.id}"
+                                        ${isSelected ? "selected" : ""}
+                                        ${isSelectedElsewhere ? "disabled" : ""}
+                                    >
+                                        ${escapeHtml(employee.name)}
+                                    </option>
+                                `;
+                            }
+                        ).join("");
+
+                        return `
+                            <div class="tip-employee-selector">
+                                <div class="select is-small">
+                                    <select
+                                        class="tip-employee-select"
+                                        data-row-index="${index}"
+                                        data-employee-index="${employeeIndex}"
+                                        aria-label="Employee"
+                                    >
+                                        ${options}
+                                    </select>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="button is-small is-light tip-employee-remove"
+                                    data-row-index="${index}"
+                                    data-employee-index="${employeeIndex}"
+                                    ${row.employeeIds.length === 1 ? "disabled" : ""}
+                                    aria-label="Remove employee"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        `;
+                    }
+                ).join("");
+
+                const allEmployeesSelected =
+                    row.employeeIds.length >= tipCalculatorEmployees.length;
 
                 rowElement.innerHTML = `
                     <div class="tip-range-control">
@@ -1782,33 +1856,17 @@
                     </div>
 
                     <div class="tip-employees-control">
-
+                        ${employeeSelectors}
+                        <div class="tip-employee-add-button">
                         <button
                             type="button"
-                            class="button is-small tip-minus"
-                            data-index="${index}"
-                            ${row.employees <= 1 ? "disabled" : ""}
-                            aria-label="Decrease employees"
+                            class="button is-small is-link is-light tip-employee-add"
+                            data-row-index="${index}"
+                            ${allEmployeesSelected ? "disabled" : ""}
                         >
-                            −
+                            + Add Employee
                         </button>
-
-                        <input
-                            type="text"
-                            class="input is-small tip-employee-count"
-                            value="${row.employees}"
-                            readonly
-                            aria-label="Number of employees"
-                        >
-
-                        <button
-                            type="button"
-                            class="button is-small tip-plus"
-                            data-index="${index}"
-                            aria-label="Increase employees"
-                        >
-                            +
-                        </button>
+                        </div>
 
                     </div>
 
@@ -1907,47 +1965,91 @@
                 });
 
 
-            document.querySelectorAll(".tip-minus")
+            document.querySelectorAll(".tip-employee-select")
+                .forEach(function(select) {
+
+                    select.addEventListener(
+                        "change",
+                        function() {
+
+                            const rowIndex = Number(
+                                this.dataset.rowIndex
+                            );
+                            const employeeIndex = Number(
+                                this.dataset.employeeIndex
+                            );
+                            const employeeId = Number(this.value);
+                            const row = tipRows[rowIndex];
+
+                            if (
+                                !row
+                                || row.employeeIds.includes(employeeId)
+                            ) {
+                                renderTipCalculator();
+                                return;
+                            }
+
+                            row.employeeIds[employeeIndex] = employeeId;
+                            renderTipCalculator();
+                        }
+                    );
+                });
+
+
+            document.querySelectorAll(".tip-employee-add")
                 .forEach(function(button) {
 
                     button.addEventListener(
                         "click",
                         function() {
 
-                            const index =
-                                Number(this.dataset.index);
+                            const row = tipRows[
+                                Number(this.dataset.rowIndex)
+                            ];
 
-                            tipRows[index].employees =
-                                Math.max(
-                                    1,
-                                    tipRows[index].employees - 1
+                            const availableEmployee =
+                                tipCalculatorEmployees.find(
+                                    function(employee) {
+                                        return !row.employeeIds.includes(
+                                            employee.id
+                                        );
+                                    }
                                 );
 
-                            updateTipTotals();
-                            renderEmployeeCounts();
+                            if (!availableEmployee) {
+                                return;
+                            }
+
+                            row.employeeIds.push(availableEmployee.id);
+                            renderTipCalculator();
                         }
                     );
                 });
 
 
-            document.querySelectorAll(".tip-plus")
+            document.querySelectorAll(".tip-employee-remove")
                 .forEach(function(button) {
 
                     button.addEventListener(
                         "click",
                         function() {
 
-                            const index =
-                                Number(this.dataset.index);
+                            const row = tipRows[
+                                Number(this.dataset.rowIndex)
+                            ];
 
-                            tipRows[index].employees += 1;
+                            if (row.employeeIds.length <= 1) {
+                                return;
+                            }
 
-                            updateTipTotals();
-                            renderEmployeeCounts();
+                            row.employeeIds.splice(
+                                Number(this.dataset.employeeIndex),
+                                1
+                            );
+                            renderTipCalculator();
                         }
                     );
                 });
-
 
             document.querySelectorAll(".tip-delete-button")
                 .forEach(function(button) {
@@ -1963,42 +2065,6 @@
                     );
                 });
         }
-
-
-        /* ---------------------------------------------------------
-        Employee display
-        --------------------------------------------------------- */
-
-        function renderEmployeeCounts() {
-
-            document.querySelectorAll(
-                ".tip-employee-count"
-            ).forEach(function(input) {
-
-                const index =
-                    Number(
-                        input.closest(".tip-row")
-                            .querySelector(".tip-minus")
-                            .dataset.index
-                    );
-
-                const employeeCount =
-                    Math.max(1, tipRows[index].employees);
-
-                input.value =
-                    employeeCount;
-
-                const minusButton =
-                    input.closest(".tip-row")
-                        .querySelector(".tip-minus");
-
-                if (minusButton) {
-                    minusButton.disabled =
-                        employeeCount <= 1;
-                }
-            });
-        }
-
 
         /* ---------------------------------------------------------
         Add / delete rows
@@ -2042,7 +2108,7 @@
             tipRows.push({
                 start: new Date(midpoint),
                 end: originalEnd,
-                employees: 1
+                employeeIds: [tipCalculatorEmployees[0].id]
             });
 
             renderTipCalculator();
@@ -2166,8 +2232,7 @@
                 const totalCents =
                     calculateRowTips(row, index);
 
-                const employees =
-                    Math.max(1, row.employees);
+                const employees = row.employeeIds.length;
 
                 const splitCents =
                     Math.floor(

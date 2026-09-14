@@ -4,6 +4,7 @@ import json
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from poynt.token import exchange_authorization_code
@@ -17,6 +18,8 @@ from poynt.client import (
 
 from dotenv import load_dotenv
 import os
+from database import SessionLocal
+from models import Employee
 from poynt.connection import get_poynt_credentials
 from organization_context import get_current_organization_id
 
@@ -994,6 +997,27 @@ def get_tip_calculator_data(orders):
 
     return tip_data
 
+
+def get_tip_calculator_employees(organization_id: int) -> list[dict]:
+    """Return active employees available for tip allocation."""
+    with SessionLocal() as session:
+        employees = session.execute(
+            select(Employee)
+            .where(
+                Employee.organization_id == organization_id,
+                Employee.is_active.is_(True),
+            )
+            .order_by(Employee.last_name, Employee.first_name)
+        ).scalars().all()
+
+    return [
+        {
+            "id": employee.id,
+            "name": f"{employee.first_name} {employee.last_name}",
+        }
+        for employee in employees
+    ]
+
 def get_stores_display(store_ids):
     """
     Convert a set of store IDs into display text.
@@ -1379,13 +1403,31 @@ async def poynt_orders(
 
     tip_calculator_data = get_tip_calculator_data(orders)
 
-    tip_calculator_enabled = len(store_ids) == 1
+    tip_calculator_employees = get_tip_calculator_employees(
+        organization_id
+    )
+
+    tip_calculator_enabled = (
+        len(store_ids) == 1
+        and bool(tip_calculator_employees)
+    )
 
     tip_calculator_store_name = (
         stores_display
-        if tip_calculator_enabled
+        if len(store_ids) == 1
         else ""
     )
+
+    if len(store_ids) != 1:
+        tip_calculator_disabled_reason = (
+            "Tip Calculator requires exactly one store in the report."
+        )
+    elif not tip_calculator_employees:
+        tip_calculator_disabled_reason = (
+            "Add an active employee before using the Tip Calculator."
+        )
+    else:
+        tip_calculator_disabled_reason = ""
 
     available_stores = [
         {
@@ -1435,8 +1477,10 @@ async def poynt_orders(
             "revenue_per_hour_report_display": revenue_per_hour_report_display,
             "profit_per_hour_display": profit_per_hour_display,
             "tip_calculator_data": tip_calculator_data,
+            "tip_calculator_employees": tip_calculator_employees,
             "tip_calculator_enabled": tip_calculator_enabled,
             "tip_calculator_store_name": tip_calculator_store_name,      
+            "tip_calculator_disabled_reason": tip_calculator_disabled_reason,
             "start_at_for_tip_calculator": start_at,
             "end_at_for_tip_calculator": end_at,                  
         },

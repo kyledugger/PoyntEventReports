@@ -103,15 +103,14 @@ body {
 
 .tip-employees-control {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: left;
+    justify-content: left;
 }
 
 .tip-employees-control .button {
-    width: 2.2rem;
     min-width: 2.2rem;
-    padding-left: 0;
-    padding-right: 0;
+    padding-left: 5px;
+    padding-right: 5px;
 }
 
 .tip-employee-count {
