@@ -157,6 +157,17 @@
         white-space: nowrap;
     }    
 
+    @media screen and (max-width: 1023px) {
+        .product-report-columns {
+            display: block;
+        }
+
+        .product-report-columns > .column {
+            width: 100%;
+            flex: none;
+        }
+    }
+
     @media screen and (max-width: 900px) {
         .metric-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -813,7 +824,7 @@
             <div class="mb-5">
                 <h2 class="title is-4">Product Reports</h2>
 
-                <div class="columns">
+                <div class="columns product-report-columns">
 
                     <div class="column is-12-mobile is-12-tablet is-6-desktop">
                         <div class="box report-card">
