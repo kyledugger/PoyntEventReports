@@ -1,12 +1,13 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from sqlalchemy import select
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
-from models import User
+from models import User, OrganizationMember
 from organization_context import get_current_organization_id
 from poynt.connection import (
     get_poynt_connection
@@ -108,6 +109,16 @@ async def dashboard(request: Request):
             status_code=303
         )
 
+    with SessionLocal() as session:
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+    role = membership.role if membership else "member"
+    can_manage_poynt = role in {"owner", "manager", "admin"}
     poynt_connection = get_poynt_connection(organization_id)
 
     return templates.TemplateResponse(
@@ -115,7 +126,9 @@ async def dashboard(request: Request):
         name="dashboard.html",
         context={
             "user": user,
-            "poynt_connection": poynt_connection
+            "poynt_connection": poynt_connection,
+            "organization_role": role,
+            "can_manage_poynt": can_manage_poynt,
         }
     )
 

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Poynt Settings - Codelian{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container" style="max-width: 800px;">
+        <div class="level mb-5">
+            <div class="level-left">
+                <div>
+                    <h1 class="title mb-1">Poynt Settings</h1>
+                    <p class="subtitle is-6">Manage the Poynt connection for this organization.</p>
+                </div>
+            </div>
+            <div class="level-right">
+                <a href="/dashboard" class="button is-light">Dashboard</a>
+            </div>
+        </div>
+
+        {% if poynt_connection %}
+            <div class="box">
+                <h2 class="title is-5">Poynt Connected</h2>
+                <div class="content">
+                    <p>
+                        <strong>Business ID:</strong>
+                        <code>{{ poynt_connection.business_id }}</code>
+                    </p>
+                    <p>
+                        <strong>Connection status:</strong> Active
+                    </p>
+                    {% if poynt_connection.expires_at %}
+                        <p>
+                            <strong>Token expiration:</strong>
+                            {{ poynt_connection.expires_at }} UTC
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div class="buttons">
+                    <a href="/oauth/start" class="button is-primary">
+                        Reconnect Poynt
+                    </a>
+                    <a href="/poynt/orders" class="button is-light">
+                        Orders Report
+                    </a>
+                </div>
+            </div>
+        {% else %}
+            <div class="box">
+                <h2 class="title is-5">Poynt Not Connected</h2>
+                <p class="mb-4">Connect this organization's Poynt account to enable Poynt reports.</p>
+                <a href="/oauth/start" class="button is-primary">
+                    Connect Poynt
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

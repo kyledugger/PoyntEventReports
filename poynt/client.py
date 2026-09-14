@@ -28,10 +28,8 @@ class PoyntClient:
         self,
         credentials: PoyntCredentials,
         organization_id: int,
-        user_id: int,
     ):
         self.organization_id = organization_id
-        self.user_id = user_id
         self.business_id = credentials.business_id
         self.access_token = credentials.access_token
         self.refresh_token = credentials.refresh_token
@@ -206,6 +204,10 @@ class PoyntClient:
             token_type=self.token_type,
             expires_at=self.expires_at,
         )
+
+    async def refresh(self) -> None:
+        """Refresh the organization's Poynt token when it enters the refresh window."""
+        await self._refresh_if_needed()
 
     async def get_catalogs(self) -> dict:
         await self._refresh_if_needed()

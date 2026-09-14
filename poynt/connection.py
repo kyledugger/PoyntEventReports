@@ -54,6 +54,14 @@ def get_poynt_credentials(
     )
 
 
+def get_all_poynt_connections() -> list[PoyntConnection]:
+    """Return all organization-owned Poynt connections."""
+    with SessionLocal() as session:
+        return session.query(PoyntConnection).order_by(
+            PoyntConnection.organization_id
+        ).all()
+
+
 def save_poynt_connection(
     organization_id: int,
     business_id: str,

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -11,6 +12,8 @@ from poynt.token import exchange_authorization_code
 from dotenv import load_dotenv
 import os
 import secrets
+from database import SessionLocal
+from models import OrganizationMember
 from poynt.connection import save_poynt_connection
 from organization_context import (
     get_current_organization_id,
@@ -71,6 +74,29 @@ async def oauth_start(request: Request):
                     "No organization is associated with this account."
                 ],
                 "show_dashboard_link": False,
+            },
+            status_code=403,
+        )
+
+    with SessionLocal() as session:
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+    role = membership.role if membership else "member"
+    if role not in {"owner", "manager", "admin"}:
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Access Denied",
+                "paragraphs": [
+                    "Only organization owners, managers, and admins can connect or reconnect Poynt."
+                ],
+                "show_dashboard_link": True,
             },
             status_code=403,
         )
@@ -147,6 +173,29 @@ async def oauth_callback(
                     "The organization associated with this authorization request could not be verified."
                 ],
                 "show_dashboard_link": False,
+            },
+            status_code=403,
+        )
+
+    with SessionLocal() as session:
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+    role = membership.role if membership else "member"
+    if role not in {"owner", "manager", "admin"}:
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Access Denied",
+                "paragraphs": [
+                    "Your account is no longer authorized to manage the organization's Poynt connection."
+                ],
+                "show_dashboard_link": True,
             },
             status_code=403,
         )

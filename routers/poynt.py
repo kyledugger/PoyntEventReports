@@ -19,9 +19,9 @@ from poynt.client import (
 from dotenv import load_dotenv
 import os
 from database import SessionLocal
-from models import Employee
+from models import Employee, OrganizationMember
 from tip_submission_model import TipSubmission
-from poynt.connection import get_poynt_credentials
+from poynt.connection import get_poynt_connection, get_poynt_credentials
 from organization_context import get_current_organization_id
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
@@ -39,6 +39,54 @@ POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 router = APIRouter()
 
 templates = Jinja2Templates(directory="templates")
+
+
+@router.get("/settings/integrations/poynt", response_class=HTMLResponse)
+async def poynt_settings(request: Request):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    organization_id = get_current_organization_id(request)
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+
+    with SessionLocal() as session:
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+    role = membership.role if membership else "member"
+    if role not in {"owner", "manager", "admin"}:
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Poynt Access Denied",
+                "paragraphs": [
+                    "Only organization owners, managers, and admins can manage the Poynt connection."
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=403,
+        )
+
+    connection = get_poynt_connection(organization_id)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="poynt_settings.html",
+        context={
+            "organization_role": role,
+            "poynt_connection": connection,
+        },
+    )
+
 
 @router.get("/poynt/catalog", response_class=HTMLResponse)
 async def poynt_catalog(request: Request):
@@ -79,7 +127,6 @@ async def poynt_catalog(request: Request):
     try:
         client = PoyntClient(
             credentials,
-            user_id=user_id,
             organization_id=organization_id,
         )
 
@@ -692,14 +739,12 @@ def get_orders_date_range(start, end):
 
 async def fetch_poynt_orders(
     credentials,
-    user_id,
     organization_id,
     start_at,
     end_at,
 ):
     client = PoyntClient(
         credentials,
-        user_id=user_id,
         organization_id=organization_id,
     )
 
@@ -1069,6 +1114,31 @@ def _get_today_utc_bounds() -> tuple[datetime, datetime]:
     )
 
 
+def _get_tip_report_date_bounds(start_date: str, end_date: str) -> tuple[datetime, datetime, str, str] | None:
+    """Convert inclusive Phoenix calendar dates into UTC database bounds."""
+    try:
+        start = datetime.fromisoformat(start_date).date()
+        end = datetime.fromisoformat(end_date).date()
+    except (TypeError, ValueError):
+        return None
+
+    if end < start:
+        return None
+
+    phoenix = ZoneInfo("America/Phoenix")
+    utc = ZoneInfo("UTC")
+
+    start_local = datetime.combine(start, datetime.min.time(), tzinfo=phoenix)
+    end_local = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=phoenix)
+
+    return (
+        start_local.astimezone(utc).replace(tzinfo=None),
+        end_local.astimezone(utc).replace(tzinfo=None),
+        start.isoformat(),
+        end.isoformat(),
+    )
+
+
 def _tip_submission_display(submission: TipSubmission) -> dict:
     try:
         data = json.loads(submission.submission_data)
@@ -1095,7 +1165,11 @@ def _tip_submission_display(submission: TipSubmission) -> dict:
 
 
 @router.get("/poynt/tip-submissions", response_class=HTMLResponse)
-async def tip_submission_report(request: Request):
+async def tip_submission_report(
+    request: Request,
+    start: str = "",
+    end: str = "",
+):
     user_id = request.session.get("user_id")
     if not user_id:
         return RedirectResponse("/login", status_code=303)
@@ -1105,7 +1179,42 @@ async def tip_submission_report(request: Request):
         request.session.clear()
         return RedirectResponse("/login", status_code=303)
 
-    day_start, day_end = _get_today_utc_bounds()
+    # Date-range access is controlled server-side. The disabled inputs on the
+    # employee view are only a UI convenience and are not an authorization check.
+    with SessionLocal() as session:
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+        role = membership.role if membership else "member"
+        can_select_date_range = role in {"owner", "manager", "payroll"}
+
+    phoenix = ZoneInfo("America/Phoenix")
+    today = datetime.now(phoenix).date().isoformat()
+
+    if can_select_date_range:
+        # Privileged users get a selectable inclusive date range. Default to today.
+        start_date = start or today
+        end_date = end or today
+        bounds = _get_tip_report_date_bounds(start_date, end_date)
+        if bounds is None:
+            start_date = today
+            end_date = today
+            bounds = _get_tip_report_date_bounds(start_date, end_date)
+            validation_message = "The selected date range was invalid, so today's submissions are shown."
+        else:
+            validation_message = ""
+    else:
+        # Everyone else can only see today's submissions, regardless of URL parameters.
+        start_date = today
+        end_date = today
+        bounds = _get_tip_report_date_bounds(start_date, end_date)
+        validation_message = ""
+
+    day_start, day_end, _, _ = bounds
 
     with SessionLocal() as session:
         submissions = session.execute(
@@ -1123,6 +1232,10 @@ async def tip_submission_report(request: Request):
         name="tip_submissions.html",
         context={
             "submissions": [_tip_submission_display(item) for item in submissions],
+            "tip_report_start_date": start_date,
+            "tip_report_end_date": end_date,
+            "tip_report_can_select_date_range": can_select_date_range,
+            "tip_report_validation_message": validation_message,
         },
     )
 
@@ -1290,7 +1403,6 @@ async def poynt_orders(
     try:
         orders = await fetch_poynt_orders(
             credentials,
-            user_id,
             organization_id,
             start_at,
             end_at,
@@ -1677,7 +1789,6 @@ async def poynt_stores(
     try:
         client = PoyntClient(
             credentials,
-            user_id=user_id,
             organization_id=organization_id,
         )
 
