@@ -464,6 +464,12 @@
                 Loaded:
                 <time id="page-loaded-time"></time>
             </div>
+            <div class="clearfix"></div>
+            <div class="mb-5">
+                <a href="/dashboard" class="button">
+                    Return to Dashboard
+                </a>
+            </div>            
         </div>
 
 
@@ -679,23 +685,11 @@
                     </div>
 
                     <div class="metric-card">
-                        <button
-                            type="button"
-                            id="fee-calculator-open"
-                            class="button is-small is-link is-light"
-                        >
-                            Fee Calculator
-                        </button>
-                    </div>                    
-
-
-                    <div class="metric-card">
                         <div class="metric-label">Revenue per Hour Time Span</div>
                         <div class="metric-value">
                             {{revenue_per_hour_report_display}}
                         </div>
                     </div>
-
 
                     <div class="metric-card">
                         <div class="metric-label">Revenue per Hour Orders</div>
@@ -724,6 +718,22 @@
                             {{tip_ratio_display}}
                         </div>
                     </div>
+
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <div class="metric-grid">            
+                    <div class="metric-card">
+                        <button
+                            type="button"
+                            id="fee-calculator-open"
+                            class="button is-small is-link is-light"
+                        >
+                            Event Fee Calculator
+                        </button>
+                    </div>    
+
                     <div class="metric-card">
 
                     <button
@@ -737,20 +747,19 @@
                     >
                         Tip Calculator
                     </button>
-                    <a
-                        href="/poynt/tip-submissions"
-                        class="button is-small is-light ml-2"
-                    >
-                        Tip Submission Report
-                    </a>
-                     </div>
+                    </div>
+                    <div class="metric-card">
+                        <a
+                            href="/poynt/tip-submissions"
+                            class="button is-small is-light ml-2"
+                        >
+                            Tip Submission Report
+                        </a>
+                    </div>            
+                </div>            
+            </div>            
 
-
-                </div>
-            </div>
-
-
-            <!-- Fast Processing -->
+                    <!-- Fast Processing -->
             <div class="mb-4">
                 <h2 class="title is-5">Fast Order Processing Times</h2>
                 <div class="metric-grid">
@@ -996,12 +1005,6 @@
 
         {% endif %}
 
-
-        <div class="mb-5">
-            <a href="/dashboard" class="button">
-                Return to Dashboard
-            </a>
-        </div>
 
     </div>
 </section>

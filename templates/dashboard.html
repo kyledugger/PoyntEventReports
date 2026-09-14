@@ -56,12 +56,12 @@
 
                 <div class="column">
                     <a
-                        href="/poynt/catalog"
-                        class="button is-link is-fullwidth"
+                        href="/poynt/tip-submissions"
+                        class="button is-primary is-fullwidth"
                     >
-                        Load Poynt Catalog
+                        Tip Submission Report
                     </a>
-                </div>
+                </div>                
 
                 {% if can_manage_poynt %}
                     <div class="column">
@@ -70,6 +70,16 @@
                             class="button is-light is-fullwidth"
                         >
                             Poynt Settings
+                        </a>
+                    </div>
+                {% endif %}
+                {% if can_manage_employees %}
+                    <div class="column">
+                        <a
+                            href="/employees"
+                            class="button is-light is-fullwidth"
+                        >
+                            Employee Management
                         </a>
                     </div>
                 {% endif %}

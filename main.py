@@ -119,6 +119,7 @@ async def dashboard(request: Request):
 
     role = membership.role if membership else "member"
     can_manage_poynt = role in {"owner", "manager", "admin"}
+    can_manage_employees = role in {"owner", "manager", "admin"}
     poynt_connection = get_poynt_connection(organization_id)
 
     return templates.TemplateResponse(
@@ -129,6 +130,7 @@ async def dashboard(request: Request):
             "poynt_connection": poynt_connection,
             "organization_role": role,
             "can_manage_poynt": can_manage_poynt,
+            "can_manage_employees": can_manage_employees,
         }
     )
 
