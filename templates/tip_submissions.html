@@ -7,7 +7,7 @@
             <div class="level-left">
                 <div>
                     <h1 class="title">Tip Submission Report</h1>
-                    <p class="subtitle is-6">Today's submitted tip ranges</p>
+                    <p class="subtitle is-6">Submitted tip ranges</p>
                 </div>
             </div>
             <div class="level-right">
@@ -15,54 +15,105 @@
             </div>
         </div>
 
+        <div class="box mb-5">
+            <form method="get" action="/poynt/tip-submissions">
+                <div class="columns is-vcentered is-variable is-3">
+                    <div class="column is-narrow">
+                        <label class="label" for="tip-report-start">Date Range</label>
+                        <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+                            <div class="control">
+                                <input
+                                    id="tip-report-start"
+                                    class="input"
+                                    type="date"
+                                    name="start"
+                                    value="{{ tip_report_start_date }}"
+                                    {% if not tip_report_can_select_date_range %}disabled{% endif %}
+                                >
+                            </div>
+                            <span>→</span>
+                            <div class="control">
+                                <input
+                                    id="tip-report-end"
+                                    class="input"
+                                    type="date"
+                                    name="end"
+                                    value="{{ tip_report_end_date }}"
+                                    {% if not tip_report_can_select_date_range %}disabled{% endif %}
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if tip_report_can_select_date_range %}
+                        <div class="column is-narrow">
+                            <label class="label" aria-hidden="true">&nbsp;</label>
+                            <button type="submit" class="button is-primary">Apply</button>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+
+            {% if tip_report_validation_message %}
+                <p class="help is-warning mt-2">{{ tip_report_validation_message }}</p>
+            {% endif %}
+        </div>
+
         {% if submissions %}
             <div class="table-container">
                 <table class="table is-fullwidth is-striped is-hoverable">
                     <thead>
                         <tr>
-                            <th>Tip Range</th>
-                            <th>Tips</th>
-                            <th>Payment</th>
                             <th>Submitted</th>
-                            <th>Employees</th>
+                            <th>Store</th>
+                            <th>Tip Ranges</th>
+                            <th>Total Tips</th>
+                            <th>Payment</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for submission in submissions %}
                             <tr>
+                                <td style="white-space: nowrap;">
+                                    <span
+                                        class="tip-report-time"
+                                        data-value="{{ submission.submitted_at }}"
+                                    ></span>
+                                </td>
+                                <td>{{ submission.store_name }}</td>
                                 <td>
-                                    <div class="mb-2">
-                                        <strong>{{ submission.store_name }}</strong>
-                                    </div>
                                     {% for tip_range in submission.ranges %}
-                                        <div class="mb-3">
+                                        <div class="mb-2">
                                             <strong>
-                                                <span class="tip-report-time" data-value="{{ tip_range.start }}"></span>
+                                                <span
+                                                    class="tip-report-time"
+                                                    data-value="{{ tip_range.start }}"
+                                                ></span>
                                                 →
-                                                <span class="tip-report-time" data-value="{{ tip_range.end }}"></span>
+                                                <span
+                                                    class="tip-report-time"
+                                                    data-value="{{ tip_range.end }}"
+                                                ></span>
                                             </strong>
                                             <br>
                                             <span class="has-text-grey is-size-7">
                                                 ${{ "%.2f"|format(tip_range.total_tip_cents / 100) }}
-                                                •
-                                                {{ tip_range.employees | map(attribute="name") | join(", ") }}
+                                                {% if tip_range.employees %}
+                                                    · {{ tip_range.employees | map(attribute="name") | join(", ") }}
+                                                {% endif %}
                                             </span>
                                         </div>
                                     {% endfor %}
-                                    <div class="mt-2 pt-2" style="border-top: 1px solid #363b45;">
-                                        <strong>Total: ${{ "%.2f"|format(submission.total_tip_cents / 100) }}</strong>
-                                    </div>
                                 </td>
-                                <td><strong>${{ "%.2f"|format(submission.total_tip_cents / 100) }}</strong></td>
-                                <td>
+                                <td style="white-space: nowrap;">
+                                    <strong>${{ "%.2f"|format(submission.total_tip_cents / 100) }}</strong>
+                                </td>
+                                <td style="white-space: nowrap;">
                                     {% if submission.payout_method == "paycheck" %}
                                         Put on paycheck
                                     {% else %}
                                         Cash out
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <span class="tip-report-time" data-value="{{ submission.submitted_at }}"></span>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -71,7 +122,7 @@
             </div>
         {% else %}
             <div class="notification is-light">
-                No tip submissions have been recorded today.
+                No tip submissions were recorded for this date range.
             </div>
         {% endif %}
     </div>
@@ -91,6 +142,7 @@
         element.textContent = new Intl.DateTimeFormat(undefined, {
             month: "short",
             day: "numeric",
+            year: "numeric",
             hour: "numeric",
             minute: "2-digit",
             hour12: true
