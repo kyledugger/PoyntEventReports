@@ -149,6 +149,14 @@ class PoyntClient:
             self.refresh_token
         )
 
+        expires_in = int(token_response["expiresIn"])
+
+        logger.info(
+            "Poynt token refreshed: expiresIn=%s seconds (%s hours)",
+            expires_in,
+            expires_in / 3600,
+        )        
+
         access_token = token_response.get("accessToken")
         refresh_token = token_response.get("refreshToken")
         token_type = token_response.get("tokenType")
