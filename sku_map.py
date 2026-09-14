@@ -158,6 +158,7 @@ sku_mapping = {
     "SHAVE-RAINBOW" : "SHAVE-Rainbow",
     "SHAVE-SHARKATTACK" : "SHAVE-SharkAttack",
     "SHAVE-BARBIE" : "SHAVE-Barbie",
+    "N-CRNBRRYFZZ" : "ENE-CranberryFizz",
     
 }
 

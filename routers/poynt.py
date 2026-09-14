@@ -428,11 +428,12 @@ def get_available_store_ids(orders):
     store_ids = set()
 
     for order in orders:
-        context = order.get("context") or {}
-        store_id = context.get("storeId")
+        for transaction in order.get("transactions") or []:
+            context = transaction.get("context") or {}
+            store_id = context.get("storeId")
 
-        if store_id:
-            store_ids.add(store_id.lower())
+            if store_id:
+                store_ids.add(store_id.lower())
 
     return sorted(
         store_ids,
@@ -467,11 +468,13 @@ def filter_orders_by_stores(orders, stores):
     filtered_orders = []
 
     for order in orders:
-        context = order.get("context") or {}
-        store_id = context.get("storeId")
+        for transaction in order.get("transactions") or []:
+            context = transaction.get("context") or {}
+            store_id = context.get("storeId")
 
-        if store_id and store_id.lower() in requested_stores:
-            filtered_orders.append(order)
+            if store_id and store_id.lower() in requested_stores:
+                filtered_orders.append(order)
+                break
 
     logger.info(
         "store filtering reduced %s orders to %s orders",
