@@ -49,7 +49,7 @@ else:
 POYNT_APP_ID = os.environ["POYNT_APP_ID"]
 POYNT_AUTHORIZE_URL = os.environ["POYNT_AUTHORIZE_URL"]
 
-app = FastAPI(title="Codelian Poynt")
+app = FastAPI(title="Food Truck Works")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

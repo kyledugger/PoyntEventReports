@@ -108,6 +108,16 @@ async def oauth_start(request: Request):
     request.session["poynt_oauth_context"] = context
     request.session["poynt_oauth_organization_id"] = organization_id
 
+    logger.info(
+        "OAUTH START DEBUG: user_id=%r organization_id=%r "
+        "context_present=%s session_keys=%s redirect_uri=%s",
+        user_id,
+        organization_id,
+        bool(context),
+        sorted(request.session.keys()),
+        POYNT_REDIRECT_URI,
+    )
+
     params = {
         "client_id": POYNT_APP_ID,
         "redirect_uri": POYNT_REDIRECT_URI,
@@ -159,6 +169,17 @@ async def oauth_callback(
             organization_id = int(organization_id)
         except (TypeError, ValueError):
             organization_id = None
+
+    logger.info(
+        "OAUTH CALLBACK DEBUG: user_id=%r organization_id=%r "
+        "expected_context_present=%s received_context_present=%s "
+        "session_keys=%s",
+        user_id,
+        organization_id,
+        bool(expected_context),
+        bool(context),
+        sorted(request.session.keys()),
+    )            
 
     if organization_id is None or not user_belongs_to_organization(
         user_id,
