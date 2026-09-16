@@ -69,6 +69,7 @@
                             <th>Submitted</th>
                             <th>Store</th>
                             <th>Tip Ranges</th>
+                            <th>Employee Totals</th>
                             <th>Total Tips</th>
                             <th>Payment</th>
                         </tr>
@@ -104,6 +105,16 @@
                                                     · {{ tip_range.employees | map(attribute="name") | join(", ") }}
                                                 {% endif %}
                                             </span>
+                                        </div>
+                                    {% endfor %}
+                                </td>
+                                <td style="min-width: 180px;">
+                                    {% for employee in submission.employee_totals %}
+                                        <div class="is-flex is-justify-content-space-between" style="gap: 1rem;">
+                                            <span>{{ employee.name }}</span>
+                                            <strong style="white-space: nowrap;">
+                                                ${{ "%.2f"|format(employee.total_tip_cents / 100) }}
+                                            </strong>
                                         </div>
                                     {% endfor %}
                                 </td>

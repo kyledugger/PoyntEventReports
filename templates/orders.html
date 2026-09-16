@@ -439,6 +439,33 @@
         margin-top: 0.85rem;
     }
 
+    .tip-employee-totals {
+        margin-top: 1.5rem;
+        padding: 1rem 1.25rem;
+        border: 1px solid var(--bulma-border);
+        border-radius: var(--bulma-radius-large);
+    }
+
+    .tip-employee-totals-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.65rem 1.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .tip-employee-total {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid var(--bulma-border-weak);
+    }
+
+    .tip-employee-total-amount {
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
     /* Footer */
     .tip-calculator-modal .modal-card-foot {
         justify-content: flex-end;
@@ -1055,6 +1082,17 @@
             >
                 Add Time Range
             </button>
+
+            <div class="tip-employee-totals">
+                <h3 class="title is-6 mb-1">Employee Totals</h3>
+                <p class="help mt-0">
+                    Combined tip allocation across all time ranges.
+                </p>
+                <div
+                    id="tip-employee-totals-list"
+                    class="tip-employee-totals-list"
+                ></div>
+            </div>
 
             <div class="field mt-5">
                 <label class="label">Tips</label>
@@ -1720,6 +1758,9 @@
         const tipCalculatorAdd =
             document.getElementById("tip-calculator-add");
 
+        const tipEmployeeTotalsList =
+            document.getElementById("tip-employee-totals-list");
+
         let tipRows = [];
 
 
@@ -2302,6 +2343,63 @@
                         formatCurrency(splitCents);
                 }
             });
+
+            renderEmployeeTipTotals();
+        }
+
+
+        function calculateEmployeeTipTotals() {
+            const totalsByEmployee = new Map();
+
+            tipRows.forEach(function(row, index) {
+                const totalCents = calculateRowTips(row, index);
+                const splitCents = Math.floor(
+                    totalCents / Math.max(1, row.employeeIds.length)
+                );
+
+                row.employeeIds.forEach(function(employeeId) {
+                    const employee = tipCalculatorEmployees.find(
+                        function(item) {
+                            return item.id === employeeId;
+                        }
+                    );
+
+                    const current = totalsByEmployee.get(employeeId) || {
+                        id: employeeId,
+                        name: employee
+                            ? employee.name
+                            : "Unknown Employee",
+                        total_tip_cents: 0
+                    };
+
+                    current.total_tip_cents += splitCents;
+                    totalsByEmployee.set(employeeId, current);
+                });
+            });
+
+            return Array.from(totalsByEmployee.values());
+        }
+
+
+        function renderEmployeeTipTotals() {
+            if (!tipEmployeeTotalsList) {
+                return;
+            }
+
+            const employeeTotals = calculateEmployeeTipTotals();
+
+            tipEmployeeTotalsList.innerHTML = employeeTotals.map(
+                function(employee) {
+                    return `
+                        <div class="tip-employee-total">
+                            <span>${escapeHtml(employee.name)}</span>
+                            <span class="tip-employee-total-amount">
+                                ${formatCurrency(employee.total_tip_cents)}
+                            </span>
+                        </div>
+                    `;
+                }
+            ).join("");
         }
 
 
@@ -2336,7 +2434,8 @@
             return {
                 report_start_at: new Date(tipCalculatorStart).toISOString(),
                 report_end_at: new Date(tipCalculatorEnd).toISOString(),
-                ranges: ranges
+                ranges: ranges,
+                employee_totals: calculateEmployeeTipTotals()
             };
         }
 
