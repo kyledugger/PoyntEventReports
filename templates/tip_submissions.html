@@ -47,12 +47,38 @@
                         </div>
                     </div>
 
-                    {% if tip_report_can_select_date_range %}
-                        <div class="column is-narrow">
-                            <label class="label" aria-hidden="true">&nbsp;</label>
-                            <button type="submit" class="button is-primary">Apply</button>
+                    <div class="column is-narrow">
+                        <label class="label" for="tip-report-payment">Payment</label>
+                        <div class="control">
+                            <div class="select">
+                                <select id="tip-report-payment" name="payment">
+                                    <option
+                                        value=""
+                                        {% if not tip_report_payment %}selected{% endif %}
+                                    >
+                                        All submissions
+                                    </option>
+                                    <option
+                                        value="paycheck"
+                                        {% if tip_report_payment == "paycheck" %}selected{% endif %}
+                                    >
+                                        Put on paycheck
+                                    </option>
+                                    <option
+                                        value="cash"
+                                        {% if tip_report_payment == "cash" %}selected{% endif %}
+                                    >
+                                        Cash out
+                                    </option>
+                                </select>
+                            </div>
                         </div>
-                    {% endif %}
+                    </div>
+
+                    <div class="column is-narrow">
+                        <label class="label" aria-hidden="true">&nbsp;</label>
+                        <button type="submit" class="button is-primary">Apply</button>
+                    </div>
                 </div>
             </form>
 

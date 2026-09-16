@@ -1222,6 +1222,7 @@ async def tip_submission_report(
     request: Request,
     start: str = "",
     end: str = "",
+    payment: str = "",
 ):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -1269,16 +1270,26 @@ async def tip_submission_report(
 
     day_start, day_end, _, _ = bounds
 
+    selected_payment = payment if payment in {"cash", "paycheck"} else ""
+
+    submission_query = select(TipSubmission).where(
+        TipSubmission.organization_id == organization_id,
+        TipSubmission.submitted_at >= day_start,
+        TipSubmission.submitted_at < day_end,
+    )
+
+    if selected_payment:
+        submission_query = submission_query.where(
+            TipSubmission.payout_method == selected_payment
+        )
+
+    submission_query = submission_query.order_by(
+        TipSubmission.submitted_at.desc(),
+        TipSubmission.id.desc(),
+    )
+
     with SessionLocal() as session:
-        submissions = session.execute(
-            select(TipSubmission)
-            .where(
-                TipSubmission.organization_id == organization_id,
-                TipSubmission.submitted_at >= day_start,
-                TipSubmission.submitted_at < day_end,
-            )
-            .order_by(TipSubmission.submitted_at.desc(), TipSubmission.id.desc())
-        ).scalars().all()
+        submissions = session.execute(submission_query).scalars().all()
 
     return templates.TemplateResponse(
         request=request,
@@ -1289,6 +1300,7 @@ async def tip_submission_report(
             "tip_report_end_date": end_date,
             "tip_report_can_select_date_range": can_select_date_range,
             "tip_report_validation_message": validation_message,
+            "tip_report_payment": selected_payment,
         },
     )
 
