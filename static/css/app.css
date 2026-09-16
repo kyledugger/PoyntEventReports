@@ -1,6 +1,16 @@
 
 
-/* Food Truck Works branding */
+/* Food Truck Works application styles */
+
+:root {
+    --poynt-primary: #3273dc;
+}
+
+body {
+    min-height: 100vh;
+}
+
+/* Brand logo */
 
 .ftw-logo {
     display: block;
@@ -13,12 +23,13 @@
     margin: 0 auto 1.5rem;
 }
 
-.ftw-logo--dashboard {
-    width: 190px;
+.ftw-logo--invitation {
+    width: min(100%, 230px);
+    margin: 0 auto 1.5rem;
 }
 
-.ftw-logo--header {
-    width: 150px;
+.ftw-logo--dashboard {
+    width: 180px;
 }
 
 @media screen and (max-width: 768px) {
@@ -26,19 +37,13 @@
         width: min(100%, 240px);
     }
 
+    .ftw-logo--invitation {
+        width: min(100%, 200px);
+    }
+
     .ftw-logo--dashboard {
         width: 155px;
     }
-}
-
-/* Food Truck Works application styles */
-
-:root {
-    --poynt-primary: #3273dc;
-}
-
-body {
-    min-height: 100vh;
 }
 
 .poynt-auth-box {

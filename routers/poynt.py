@@ -40,7 +40,6 @@ router = APIRouter()
 
 templates = Jinja2Templates(directory="templates")
 
-
 @router.get("/settings/integrations/poynt", response_class=HTMLResponse)
 async def poynt_settings(request: Request):
     user_id = request.session.get("user_id")

@@ -11,14 +11,20 @@
             <div class="column is-5-tablet is-4-desktop">
 
                 <div class="box">
-                    
-                <img
-                    src="/static/images/food-truck-works-logo.png"
-                    alt="Food Truck Works"
-                    class="ftw-logo ftw-logo--auth"
-                    width="1039"
-                    height="883"
-                >
+
+                    <picture>
+                        <source
+                            srcset="/static/images/food-truck-works-logo-dark.png"
+                            media="(prefers-color-scheme: dark)"
+                        >
+                        <img
+                            src="/static/images/food-truck-works-logo.png"
+                            alt="Food Truck Works"
+                            class="ftw-logo ftw-logo--invitation"
+                            width="1039"
+                            height="883"
+                        >
+                    </picture>
 
                     <p class="subtitle has-text-centered">
                         Sign in to your account
