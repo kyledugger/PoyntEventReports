@@ -1,6 +1,37 @@
 
 
-/* Poynt application styles */
+/* Food Truck Works branding */
+
+.ftw-logo {
+    display: block;
+    width: auto;
+    height: auto;
+}
+
+.ftw-logo--auth {
+    width: min(100%, 290px);
+    margin: 0 auto 1.5rem;
+}
+
+.ftw-logo--dashboard {
+    width: 190px;
+}
+
+.ftw-logo--header {
+    width: 150px;
+}
+
+@media screen and (max-width: 768px) {
+    .ftw-logo--auth {
+        width: min(100%, 240px);
+    }
+
+    .ftw-logo--dashboard {
+        width: 155px;
+    }
+}
+
+/* Food Truck Works application styles */
 
 :root {
     --poynt-primary: #3273dc;
