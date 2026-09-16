@@ -28,8 +28,17 @@ body {
     margin: 0 auto 1.5rem;
 }
 
-.ftw-logo--dashboard {
-    width: 180px;
+.ftw-app-brand {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+}
+
+.ftw-app-brand picture {
+    display: block;
+}
+
+.ftw-logo--app-header {
+    width: min(100%, 360px);
 }
 
 @media screen and (max-width: 768px) {
@@ -41,8 +50,8 @@ body {
         width: min(100%, 200px);
     }
 
-    .ftw-logo--dashboard {
-        width: 155px;
+    .ftw-logo--app-header {
+        width: min(100%, 300px);
     }
 }
 
