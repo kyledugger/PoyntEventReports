@@ -1686,9 +1686,30 @@
             ordersForm.addEventListener("submit", showOrdersLoading);
         }
 
-        window.addEventListener("beforeunload", function() {
-            showOrdersLoading();
-        });
+        function resetOrdersLoading() {
+            if (ordersReport) {
+                ordersReport.style.display = "";
+            }
+
+            if (validationMessage) {
+                validationMessage.style.display = "";
+            }
+
+            if (ordersLoading) {
+                ordersLoading.style.display = "none";
+            }
+
+            const generateButton = ordersForm && ordersForm.querySelector(
+                'button[type="submit"]'
+            );
+
+            if (generateButton) {
+                generateButton.disabled = false;
+                generateButton.textContent = "Generate";
+            }
+        }
+
+        window.addEventListener("pageshow", resetOrdersLoading);
 
         function setToday() {
             const now = new Date();
