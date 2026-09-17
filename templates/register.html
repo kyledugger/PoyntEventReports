@@ -67,6 +67,21 @@
                         </div>
 
                         <div class="field">
+                            <label class="label" for="phone">Phone</label>
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="tel"
+                                    id="phone"
+                                    name="phone"
+                                    value="{{ phone or '' }}"
+                                    autocomplete="tel"
+                                >
+                            </div>
+                            <p class="help">Optional.</p>
+                        </div>
+
+                        <div class="field">
                             <label class="label" for="password">Password</label>
                             <div class="control">
                                 <input

@@ -23,9 +23,25 @@ class User(Base):
         nullable=False
     )
 
+    phone: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
     password_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

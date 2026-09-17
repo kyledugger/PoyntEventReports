@@ -890,6 +890,7 @@ async def create_account(
         user = User(
             email=email,
             password_hash=hash_password(password),
+            is_active=True,
         )
 
         session.add(user)

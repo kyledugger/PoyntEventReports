@@ -36,11 +36,13 @@ async def register(
     request: Request,
     organization_name: str = Form(...),
     email: str = Form(...),
+    phone: str = Form(""),
     password: str = Form(...),
     confirm_password: str = Form(...)
 ):
     organization_name = organization_name.strip()
     email = email.strip().lower()
+    phone = phone.strip() or None
 
     if not organization_name:
         return templates.TemplateResponse(
@@ -50,6 +52,7 @@ async def register(
                 "error": "Organization name is required.",
                 "organization_name": organization_name,
                 "email": email,
+                "phone": phone or "",
             },
             status_code=400
         )
@@ -62,6 +65,7 @@ async def register(
                 "error": "Passwords do not match.",
                 "organization_name": organization_name,
                 "email": email,
+                "phone": phone or "",
             },
             status_code=400
         )
@@ -75,6 +79,7 @@ async def register(
                 "error": password_error,
                 "organization_name": organization_name,
                 "email": email,
+                "phone": phone or "",
             },
             status_code=400
         )
@@ -92,6 +97,7 @@ async def register(
                     "error": "An account with that email already exists.",
                     "organization_name": organization_name,
                     "email": email,
+                    "phone": phone or "",
                 },
                 status_code=400
             )
@@ -100,6 +106,7 @@ async def register(
         # in the same transaction.
         user = User(
             email=email,
+            phone=phone,
             password_hash=hash_password(password)
         )
         session.add(user)
@@ -165,7 +172,7 @@ async def login(
             password_valid,
         )
 
-        if not user or not password_valid:
+        if not user or not password_valid or not user.is_active:
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
