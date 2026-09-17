@@ -7,9 +7,8 @@
 <section class="section">
     <div class="container">
 
-        <nav class="level mb-5">
-
-            <div class="level-left">
+        <nav class="ftw-dashboard-header mb-5">
+            <div class="ftw-dashboard-identity">
                 <div>
                     {% include "_app_brand.html" %}
 
@@ -19,17 +18,11 @@
                 </div>
             </div>
 
-            <div class="level-right">
+            <div class="ftw-dashboard-actions">
                 <form method="post" action="/logout">
-                    <button
-                        type="submit"
-                        class="button is-light"
-                    >
-                        Log Out
-                    </button>
+                    <button type="submit" class="button is-light">Log Out</button>
                 </form>
             </div>
-
         </nav>
 
 

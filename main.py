@@ -7,8 +7,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
-from models import User, OrganizationMember
+from models import User
 from organization_context import get_current_organization_id
+from permissions import (
+    get_organization_role,
+    role_can_manage_employees,
+    role_can_manage_integrations,
+)
 from poynt.connection import (
     get_poynt_connection
 )
@@ -109,17 +114,13 @@ async def dashboard(request: Request):
             status_code=303
         )
 
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
+    role = get_organization_role(user_id, organization_id)
+    if role is None:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
 
-    role = membership.role if membership else "member"
-    can_manage_poynt = role in {"owner", "manager", "admin"}
-    can_manage_employees = role in {"owner", "manager", "admin"}
+    can_manage_poynt = role_can_manage_integrations(role)
+    can_manage_employees = role_can_manage_employees(role)
     poynt_connection = get_poynt_connection(organization_id)
 
     return templates.TemplateResponse(

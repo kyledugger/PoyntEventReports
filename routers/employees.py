@@ -11,6 +11,7 @@ from auth import hash_password
 from database import SessionLocal
 from models import Employee, OrganizationInvitation, OrganizationMember, Organization, User
 from organization_context import get_current_organization_id
+from permissions import get_organization_role, role_can_manage_employees
 
 
 router = APIRouter()
@@ -33,19 +34,9 @@ def get_management_access(request: Request):
     if organization_id is None:
         return None
 
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-
-        if not membership:
-            return None
-
-        if membership.role not in ("owner", "manager"):
-            return None
+    role = get_organization_role(user_id, organization_id)
+    if not role_can_manage_employees(role):
+        return None
 
     return organization_id
 

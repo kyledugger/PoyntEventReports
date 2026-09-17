@@ -23,6 +23,11 @@ from models import Employee, OrganizationMember
 from tip_submission_model import TipSubmission
 from poynt.connection import get_poynt_connection, get_poynt_credentials
 from organization_context import get_current_organization_id
+from permissions import (
+    get_organization_role,
+    role_can_manage_integrations,
+    role_can_view_payroll_reports,
+)
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
 load_dotenv(dotenv_file)
@@ -53,23 +58,15 @@ async def poynt_settings(request: Request):
         request.session.clear()
         return RedirectResponse("/login", status_code=303)
 
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-
-    role = membership.role if membership else "member"
-    if role not in {"owner", "manager", "admin"}:
+    role = get_organization_role(user_id, organization_id)
+    if not role_can_manage_integrations(role):
         return templates.TemplateResponse(
             request=request,
             name="message.html",
             context={
                 "title": "Poynt Access Denied",
                 "paragraphs": [
-                    "Only organization owners, managers, and admins can manage the Poynt connection."
+                    "Only organization owners and managers can manage the Poynt connection."
                 ],
                 "show_dashboard_link": True,
             },
@@ -1139,63 +1136,11 @@ def _get_tip_report_date_bounds(start_date: str, end_date: str) -> tuple[datetim
     )
 
 
-def _aggregate_tip_allocations(ranges: list) -> list[dict]:
-    """Sum each employee's per-range allocation across a submission."""
-    totals: dict[str, dict] = {}
-
-    for tip_range in ranges:
-        if not isinstance(tip_range, dict):
-            continue
-
-        employees = tip_range.get("employees") or []
-        if not isinstance(employees, list) or not employees:
-            continue
-
-        try:
-            raw_per_employee_cents = tip_range.get("per_employee_cents")
-            if raw_per_employee_cents is None:
-                raise ValueError
-            per_employee_cents = int(raw_per_employee_cents)
-        except (TypeError, ValueError):
-            try:
-                total_tip_cents = int(tip_range.get("total_tip_cents", 0))
-            except (TypeError, ValueError):
-                total_tip_cents = 0
-            per_employee_cents = total_tip_cents // len(employees)
-
-        for employee in employees:
-            if not isinstance(employee, dict):
-                continue
-
-            employee_id = employee.get("id")
-            employee_name = employee.get("name") or "Unknown Employee"
-            key = (
-                f"id:{employee_id}"
-                if employee_id is not None
-                else f"name:{employee_name.casefold()}"
-            )
-
-            if key not in totals:
-                totals[key] = {
-                    "id": employee_id,
-                    "name": employee_name,
-                    "total_tip_cents": 0,
-                }
-
-            totals[key]["total_tip_cents"] += max(0, per_employee_cents)
-
-    return list(totals.values())
-
-
 def _tip_submission_display(submission: TipSubmission) -> dict:
     try:
         data = json.loads(submission.submission_data)
     except (TypeError, ValueError):
         data = {}
-
-    ranges = data.get("ranges", [])
-    if not isinstance(ranges, list):
-        ranges = []
 
     return {
         "id": submission.id,
@@ -1205,11 +1150,10 @@ def _tip_submission_display(submission: TipSubmission) -> dict:
         "total_tip_cents": submission.total_tip_cents,
         "payout_method": submission.payout_method,
         "submitted_at": submission.submitted_at.isoformat(),
-        "ranges": ranges,
-        "employee_totals": _aggregate_tip_allocations(ranges),
+        "ranges": data.get("ranges", []),
         "employee_names": [
             employee.get("name", "Unknown Employee")
-            for tip_range in ranges
+            for tip_range in data.get("ranges", [])
             if isinstance(tip_range, dict)
             for employee in (tip_range.get("employees") or [])
             if isinstance(employee, dict)
@@ -1222,7 +1166,6 @@ async def tip_submission_report(
     request: Request,
     start: str = "",
     end: str = "",
-    payment: str = "",
 ):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -1235,16 +1178,8 @@ async def tip_submission_report(
 
     # Date-range access is controlled server-side. The disabled inputs on the
     # employee view are only a UI convenience and are not an authorization check.
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-
-        role = membership.role if membership else "member"
-        can_select_date_range = role in {"owner", "manager", "payroll"}
+    role = get_organization_role(user_id, organization_id)
+    can_select_date_range = role_can_view_payroll_reports(role)
 
     phoenix = ZoneInfo("America/Phoenix")
     today = datetime.now(phoenix).date().isoformat()
@@ -1270,26 +1205,16 @@ async def tip_submission_report(
 
     day_start, day_end, _, _ = bounds
 
-    selected_payment = payment if payment in {"cash", "paycheck"} else ""
-
-    submission_query = select(TipSubmission).where(
-        TipSubmission.organization_id == organization_id,
-        TipSubmission.submitted_at >= day_start,
-        TipSubmission.submitted_at < day_end,
-    )
-
-    if selected_payment:
-        submission_query = submission_query.where(
-            TipSubmission.payout_method == selected_payment
-        )
-
-    submission_query = submission_query.order_by(
-        TipSubmission.submitted_at.desc(),
-        TipSubmission.id.desc(),
-    )
-
     with SessionLocal() as session:
-        submissions = session.execute(submission_query).scalars().all()
+        submissions = session.execute(
+            select(TipSubmission)
+            .where(
+                TipSubmission.organization_id == organization_id,
+                TipSubmission.submitted_at >= day_start,
+                TipSubmission.submitted_at < day_end,
+            )
+            .order_by(TipSubmission.submitted_at.desc(), TipSubmission.id.desc())
+        ).scalars().all()
 
     return templates.TemplateResponse(
         request=request,
@@ -1300,7 +1225,6 @@ async def tip_submission_report(
             "tip_report_end_date": end_date,
             "tip_report_can_select_date_range": can_select_date_range,
             "tip_report_validation_message": validation_message,
-            "tip_report_payment": selected_payment,
         },
     )
 

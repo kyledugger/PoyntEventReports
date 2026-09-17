@@ -41,6 +41,35 @@ body {
     width: min(100%, 360px);
 }
 
+
+.ftw-dashboard-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.ftw-dashboard-identity {
+    min-width: 0;
+}
+
+.ftw-dashboard-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+@media (max-width: 768px) {
+    .ftw-dashboard-header {
+        flex-direction: column;
+    }
+
+    .ftw-dashboard-actions {
+        margin-left: 0;
+    }
+}
+
+
 @media screen and (max-width: 768px) {
     .ftw-logo--auth {
         width: min(100%, 240px);

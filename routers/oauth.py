@@ -14,7 +14,9 @@ import os
 import secrets
 from database import SessionLocal
 from models import OrganizationMember
+
 from poynt.connection import save_poynt_connection
+from permissions import get_organization_role, role_can_manage_integrations
 from organization_context import (
     get_current_organization_id,
     user_belongs_to_organization,
@@ -78,23 +80,15 @@ async def oauth_start(request: Request):
             status_code=403,
         )
 
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-
-    role = membership.role if membership else "member"
-    if role not in {"owner", "manager", "admin"}:
+    role = get_organization_role(user_id, organization_id)
+    if not role_can_manage_integrations(role):
         return templates.TemplateResponse(
             request=request,
             name="message.html",
             context={
                 "title": "Poynt Access Denied",
                 "paragraphs": [
-                    "Only organization owners, managers, and admins can connect or reconnect Poynt."
+                    "Only organization owners and managers can connect or reconnect Poynt."
                 ],
                 "show_dashboard_link": True,
             },
@@ -107,16 +101,6 @@ async def oauth_start(request: Request):
     # Bind this OAuth request to the current organization.
     request.session["poynt_oauth_context"] = context
     request.session["poynt_oauth_organization_id"] = organization_id
-
-    logger.info(
-        "OAUTH START DEBUG: user_id=%r organization_id=%r "
-        "context_present=%s session_keys=%s redirect_uri=%s",
-        user_id,
-        organization_id,
-        bool(context),
-        sorted(request.session.keys()),
-        POYNT_REDIRECT_URI,
-    )
 
     params = {
         "client_id": POYNT_APP_ID,
@@ -170,17 +154,6 @@ async def oauth_callback(
         except (TypeError, ValueError):
             organization_id = None
 
-    logger.info(
-        "OAUTH CALLBACK DEBUG: user_id=%r organization_id=%r "
-        "expected_context_present=%s received_context_present=%s "
-        "session_keys=%s",
-        user_id,
-        organization_id,
-        bool(expected_context),
-        bool(context),
-        sorted(request.session.keys()),
-    )            
-
     if organization_id is None or not user_belongs_to_organization(
         user_id,
         organization_id,
@@ -198,16 +171,8 @@ async def oauth_callback(
             status_code=403,
         )
 
-    with SessionLocal() as session:
-        membership = session.execute(
-            select(OrganizationMember).where(
-                OrganizationMember.user_id == user_id,
-                OrganizationMember.organization_id == organization_id,
-            )
-        ).scalar_one_or_none()
-
-    role = membership.role if membership else "member"
-    if role not in {"owner", "manager", "admin"}:
+    role = get_organization_role(user_id, organization_id)
+    if not role_can_manage_integrations(role):
         return templates.TemplateResponse(
             request=request,
             name="message.html",
