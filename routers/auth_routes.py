@@ -182,13 +182,13 @@ async def login(
                 status_code=401
             )
 
-        membership = session.execute(
+        memberships = session.execute(
             select(OrganizationMember)
             .where(OrganizationMember.user_id == user.id)
             .order_by(OrganizationMember.id)
-        ).scalars().first()
+        ).scalars().all()
 
-        if not membership:
+        if not memberships:
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
@@ -199,12 +199,100 @@ async def login(
             )
 
         request.session["user_id"] = user.id
-        request.session["organization_id"] = membership.organization_id
+
+        if len(memberships) == 1:
+            request.session["organization_id"] = memberships[0].organization_id
+            destination = "/dashboard"
+        else:
+            # Do not silently choose an organization for a multi-organization user.
+            request.session.pop("organization_id", None)
+            destination = "/organizations/select"
 
     return RedirectResponse(
-        "/dashboard",
+        destination,
         status_code=303
     )
+
+
+@router.get("/organizations/select", response_class=HTMLResponse)
+async def select_organization_page(request: Request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user or not user.is_active:
+            request.session.clear()
+            return RedirectResponse("/login", status_code=303)
+
+        memberships = session.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.user_id == user_id)
+            .order_by(OrganizationMember.id)
+        ).scalars().all()
+
+        if not memberships:
+            request.session.clear()
+            return RedirectResponse("/login", status_code=303)
+
+        organizations = []
+        for membership in memberships:
+            organization = session.get(Organization, membership.organization_id)
+            if organization:
+                organizations.append({
+                    "id": organization.id,
+                    "name": organization.name,
+                    "role": membership.role,
+                })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="organization_select.html",
+        context={
+            "user": user,
+            "organizations": organizations,
+            "active_organization_id": request.session.get("organization_id"),
+        },
+    )
+
+
+@router.post("/organizations/select")
+async def select_organization(
+    request: Request,
+    organization_id: int = Form(...),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user or not user.is_active:
+            request.session.clear()
+            return RedirectResponse("/login", status_code=303)
+
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+        if not membership:
+            return templates.TemplateResponse(
+                request=request,
+                name="message.html",
+                context={
+                    "title": "Organization Access Denied",
+                    "message": "You do not have access to that organization.",
+                },
+                status_code=403,
+            )
+
+        request.session["organization_id"] = membership.organization_id
+
+    return RedirectResponse("/dashboard", status_code=303)
 
 
 @router.post("/logout")

@@ -7,11 +7,12 @@ from models import OrganizationMember
 
 def get_current_organization_id(request: Request) -> int | None:
     """
-    Return the organization currently associated with the logged-in user.
+    Return the authenticated user's active organization.
 
-    The organization_id stored in the session is validated against the
-    user's memberships. If it is missing or stale, the first membership
-    is selected and stored in the session.
+    A session organization is always validated against OrganizationMember.
+    If the user has exactly one membership, it may be selected automatically.
+    If the user has multiple memberships and no valid active organization,
+    return None so the caller can require an explicit organization choice.
     """
     user_id = request.session.get("user_id")
     if not user_id:
@@ -21,27 +22,35 @@ def get_current_organization_id(request: Request) -> int | None:
 
     with SessionLocal() as session:
         if session_org_id is not None:
-            membership = session.execute(
-                select(OrganizationMember).where(
-                    OrganizationMember.user_id == user_id,
-                    OrganizationMember.organization_id == int(session_org_id),
-                )
-            ).scalar_one_or_none()
+            try:
+                organization_id = int(session_org_id)
+            except (TypeError, ValueError):
+                request.session.pop("organization_id", None)
+            else:
+                membership = session.execute(
+                    select(OrganizationMember).where(
+                        OrganizationMember.user_id == user_id,
+                        OrganizationMember.organization_id == organization_id,
+                    )
+                ).scalar_one_or_none()
 
-            if membership:
-                return membership.organization_id
+                if membership:
+                    return membership.organization_id
 
-        membership = session.execute(
+                request.session.pop("organization_id", None)
+
+        memberships = session.execute(
             select(OrganizationMember)
             .where(OrganizationMember.user_id == user_id)
             .order_by(OrganizationMember.id)
-        ).scalars().first()
+        ).scalars().all()
 
-        if not membership:
-            return None
+        if len(memberships) == 1:
+            organization_id = memberships[0].organization_id
+            request.session["organization_id"] = organization_id
+            return organization_id
 
-        request.session["organization_id"] = membership.organization_id
-        return membership.organization_id
+        return None
 
 
 def user_belongs_to_organization(user_id: int, organization_id: int) -> bool:

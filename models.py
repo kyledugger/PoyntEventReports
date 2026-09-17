@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -130,6 +130,13 @@ class OrganizationMember(Base):
 
 class Employee(Base):
     __tablename__ = "employees"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id",
+            "user_id",
+            name="uq_employees_organization_user",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -142,7 +149,6 @@ class Employee(Base):
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"),
         nullable=True,
-        unique=True,
         index=True,
     )   
 

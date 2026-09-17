@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from database import Base, SessionLocal, engine
-from models import User
+from models import User, Organization, OrganizationMember
 from organization_context import get_current_organization_id
 from permissions import (
     get_organization_role,
@@ -108,16 +108,33 @@ async def dashboard(request: Request):
     organization_id = get_current_organization_id(request)
 
     if organization_id is None:
-        request.session.clear()
         return RedirectResponse(
-            "/login",
+            "/organizations/select",
             status_code=303
         )
 
     role = get_organization_role(user_id, organization_id)
     if role is None:
-        request.session.clear()
-        return RedirectResponse("/login", status_code=303)
+        request.session.pop("organization_id", None)
+        return RedirectResponse("/organizations/select", status_code=303)
+
+    with SessionLocal() as session:
+        active_organization = session.get(Organization, organization_id)
+        memberships = session.execute(
+            select(OrganizationMember)
+            .where(OrganizationMember.user_id == user_id)
+            .order_by(OrganizationMember.id)
+        ).scalars().all()
+
+        organization_options = []
+        for membership in memberships:
+            organization = session.get(Organization, membership.organization_id)
+            if organization:
+                organization_options.append({
+                    "id": organization.id,
+                    "name": organization.name,
+                    "role": membership.role,
+                })
 
     can_manage_poynt = role_can_manage_integrations(role)
     can_manage_employees = role_can_manage_employees(role)
@@ -130,6 +147,8 @@ async def dashboard(request: Request):
             "user": user,
             "poynt_connection": poynt_connection,
             "organization_role": role,
+            "active_organization": active_organization,
+            "organization_options": organization_options,
             "can_manage_poynt": can_manage_poynt,
             "can_manage_employees": can_manage_employees,
         }

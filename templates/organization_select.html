@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Choose a Business - Food Truck Works{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container" style="max-width: 720px;">
+        <div class="mb-5">
+            {% include "_app_brand.html" %}
+            <h1 class="title is-4 mt-5 mb-2">Choose a business</h1>
+            <p class="subtitle is-6">
+                Select the business you want to work in as {{ user.email }}.
+            </p>
+        </div>
+
+        <div class="box">
+            {% for organization in organizations %}
+                <form method="post" action="/organizations/select" class="mb-3">
+                    <input type="hidden" name="organization_id" value="{{ organization.id }}">
+                    <button type="submit" class="button is-light is-fullwidth is-justify-content-space-between" style="height: auto; min-height: 4.5rem; white-space: normal;">
+                        <span class="has-text-left">
+                            <strong>{{ organization.name }}</strong><br>
+                            <span class="is-size-7 has-text-grey">{{ organization.role|capitalize }}</span>
+                        </span>
+                        {% if active_organization_id == organization.id %}
+                            <span class="tag is-success is-light">Current</span>
+                        {% endif %}
+                    </button>
+                </form>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="/logout" class="has-text-centered mt-5">
+            <button type="submit" class="button is-text">Log Out</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

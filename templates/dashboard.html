@@ -19,9 +19,22 @@
             </div>
 
             <div class="ftw-dashboard-actions">
-                <form method="post" action="/logout">
-                    <button type="submit" class="button is-light">Log Out</button>
-                </form>
+                <div class="buttons">
+                    {% if organization_options|length > 1 %}
+                        <a href="/organizations/select" class="button is-light">
+                            {{ active_organization.name if active_organization else "Choose business" }}
+                            <span class="ml-2">▾</span>
+                        </a>
+                    {% elif active_organization %}
+                        <span class="button is-static">
+                            {{ active_organization.name }}
+                        </span>
+                    {% endif %}
+
+                    <form method="post" action="/logout">
+                        <button type="submit" class="button is-light">Log Out</button>
+                    </form>
+                </div>
             </div>
         </nav>
 
