@@ -6,7 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-from auth import hash_password
+from auth import hash_password, validate_password
 
 from database import SessionLocal
 from models import Employee, OrganizationInvitation, OrganizationMember, Organization, User
@@ -852,6 +852,21 @@ async def create_account(
                     "invitation": invitation,
                     "token": token,
                     "error": "Passwords do not match.",
+                },
+                status_code=400,
+            )
+
+        password_error = validate_password(password)
+        if password_error:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_create_account.html",
+                context={
+                    "organization": organization,
+                    "employee": employee,
+                    "invitation": invitation,
+                    "token": token,
+                    "error": password_error,
                 },
                 status_code=400,
             )

@@ -72,11 +72,17 @@
                             id="password"
                             name="password"
                             type="password"
+                            minlength="10"
+                            maxlength="128"
                             required
                             autocomplete="new-password"
                         >
                     </div>
                 </div>
+
+                <p class="help mb-4">
+                    Use 10 to 128 characters. Spaces are allowed.
+                </p>
 
                 <div class="field">
                     <label class="label" for="confirm_password">
@@ -89,6 +95,8 @@
                             id="confirm_password"
                             name="confirm_password"
                             type="password"
+                            minlength="12"
+                            maxlength="128"
                             required
                             autocomplete="new-password"
                         >

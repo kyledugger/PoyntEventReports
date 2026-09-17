@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
 
-from auth import hash_password, verify_password
+from auth import hash_password, validate_password, verify_password
 from database import SessionLocal
 from models import User, Organization, OrganizationMember
 
@@ -36,7 +36,8 @@ async def register(
     request: Request,
     organization_name: str = Form(...),
     email: str = Form(...),
-    password: str = Form(...)
+    password: str = Form(...),
+    confirm_password: str = Form(...)
 ):
     organization_name = organization_name.strip()
     email = email.strip().lower()
@@ -47,6 +48,31 @@ async def register(
             name="register.html",
             context={
                 "error": "Organization name is required.",
+                "organization_name": organization_name,
+                "email": email,
+            },
+            status_code=400
+        )
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "error": "Passwords do not match.",
+                "organization_name": organization_name,
+                "email": email,
+            },
+            status_code=400
+        )
+
+    password_error = validate_password(password)
+    if password_error:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "error": password_error,
                 "organization_name": organization_name,
                 "email": email,
             },
