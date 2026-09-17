@@ -159,7 +159,7 @@ sku_mapping = {
     "SHAVE-SHARKATTACK" : "SHAVE-SharkAttack",
     "SHAVE-BARBIE" : "SHAVE-Barbie",
     "N-CRNBRRYFZZ" : "ENE-CranberryFizz",
-    
+    "COFF-Custom" : "COF-Custom",    
 }
 
 def fix_sku(sku):
