@@ -1,48 +1,54 @@
 {% extends "base.html" %}
 
 {% block content %}
-
 <section class="section">
     <div class="container" style="max-width: 700px;">
-
-        <picture>
-            <source
-                srcset="/static/images/food-truck-works-logo-dark.png"
-                media="(prefers-color-scheme: dark)"
-            >
-            <img
-                src="/static/images/food-truck-works-logo.png"
-                alt="Food Truck Works"
-                class="ftw-logo ftw-logo--invitation"
-                width="1039"
-                height="883"
-            >
-        </picture>
+        {% include "_app_brand.html" %}
 
         <div class="box">
+            <h1 class="title">Use Your Existing Account</h1>
 
-            <h1 class="title">
-                Account Already Exists
-            </h1>
-
-            <p class="mb-5">
-                An account already exists for
+            <p class="mb-4">
+                A Food Truck Works account already exists for
                 <strong>{{ employee.email }}</strong>.
             </p>
 
             <p class="mb-5">
-                Sign in to your existing account to continue.
+                Enter the password for that account to join
+                <strong>{{ organization.name }}</strong>. This will link your
+                employee record to your existing Food Truck Works account.
             </p>
 
-            <div class="buttons">
-                <a href="/login" class="button is-primary">
-                    Sign In
-                </a>
+            {% if error %}
+            <div class="notification is-danger is-light">
+                {{ error }}
             </div>
+            {% endif %}
 
+            <form method="post" action="/invite/{{ token }}/existing-account">
+                <div class="field">
+                    <label class="label" for="password">Password</label>
+                    <div class="control">
+                        <input
+                            class="input"
+                            id="password"
+                            name="password"
+                            type="password"
+                            autocomplete="current-password"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="field mt-5">
+                    <div class="control">
+                        <button type="submit" class="button is-primary">
+                            Sign In and Join Organization
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
-
     </div>
 </section>
-
 {% endblock %}

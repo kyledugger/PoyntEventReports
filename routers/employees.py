@@ -6,7 +6,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-from auth import hash_password, validate_password
+from auth import hash_password, validate_password, verify_password
 
 from database import SessionLocal
 from models import Employee, OrganizationInvitation, OrganizationMember, Organization, User
@@ -447,6 +447,25 @@ async def invite_employee(
                 status_code=400,
             )
 
+        # An employee already linked to a Food Truck Works user does not
+        # need another account invitation.
+        if employee.user_id is not None:
+            return templates.TemplateResponse(
+                request=request,
+                name="message.html",
+                context={
+                    "title": "Employee Already Has Access",
+                    "paragraphs": [
+                        (
+                            f"{employee.first_name} {employee.last_name} "
+                            "is already linked to a Food Truck Works account."
+                        ),
+                    ],
+                    "show_dashboard_link": True,
+                },
+                status_code=400,
+            )
+
         # Expire any previous unused invitations for this employee.
         now = datetime.utcnow()
 
@@ -727,6 +746,8 @@ async def create_account_page(
                 context={
                     "employee": employee,
                     "organization": organization,
+                    "token": token,
+                    "error": None,
                 },
             )
 
@@ -871,6 +892,20 @@ async def create_account(
                 status_code=400,
             )
 
+        if employee.user_id is not None:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={
+                    "title": "Invitation Unavailable",
+                    "message": (
+                        "This employee is already linked to a Food Truck Works "
+                        "account."
+                    ),
+                },
+                status_code=410,
+            )
+
         email = employee.email.strip().lower()
 
         existing_user = session.execute(
@@ -884,6 +919,8 @@ async def create_account(
                 context={
                     "employee": employee,
                     "organization": organization,
+                    "token": token,
+                    "error": None,
                 },
             )
 
@@ -917,3 +954,115 @@ async def create_account(
         "/dashboard",
         status_code=303,
     )    
+
+@router.post("/invite/{token}/existing-account")
+async def accept_invitation_with_existing_account(
+    request: Request,
+    token: str,
+    password: str = Form(...),
+):
+    """Accept an employee invitation using the account for the invited email."""
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = datetime.utcnow()
+
+    with SessionLocal() as session:
+        result = session.execute(
+            select(OrganizationInvitation, Employee, Organization)
+            .join(Employee, Employee.id == OrganizationInvitation.employee_id)
+            .join(Organization, Organization.id == OrganizationInvitation.organization_id)
+            .where(OrganizationInvitation.token_hash == token_hash)
+        ).first()
+
+        if result is None:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={"title": "Invalid Invitation", "message": "This invitation link is not valid."},
+                status_code=404,
+            )
+
+        invitation, employee, organization = result
+
+        if employee.organization_id != invitation.organization_id:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={"title": "Invalid Invitation", "message": "This invitation link is not valid."},
+                status_code=404,
+            )
+
+        if invitation.accepted_at is not None:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={
+                    "title": "Invitation Already Used",
+                    "message": "This invitation has already been accepted and can no longer be used.",
+                },
+                status_code=410,
+            )
+
+        if invitation.expires_at <= now or not employee.is_active:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={
+                    "title": "Invitation Unavailable",
+                    "message": "This invitation is no longer available. Please contact your manager.",
+                },
+                status_code=410,
+            )
+
+        if employee.user_id is not None:
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_invalid.html",
+                context={
+                    "title": "Invitation Unavailable",
+                    "message": "This employee is already linked to a Food Truck Works account.",
+                },
+                status_code=410,
+            )
+
+        email = employee.email.strip().lower()
+        user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+
+        if user is None or not user.is_active or not verify_password(password, user.password_hash):
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_existing_account.html",
+                context={
+                    "employee": employee,
+                    "organization": organization,
+                    "token": token,
+                    "error": "Invalid password.",
+                },
+                status_code=401,
+            )
+
+        membership = session.execute(
+            select(OrganizationMember).where(
+                OrganizationMember.organization_id == organization.id,
+                OrganizationMember.user_id == user.id,
+            )
+        ).scalar_one_or_none()
+
+        # Preserve an existing organization role. Only create a membership
+        # when this user does not already belong to the organization.
+        if membership is None:
+            session.add(
+                OrganizationMember(
+                    organization_id=organization.id,
+                    user_id=user.id,
+                    role="member",
+                )
+            )
+
+        employee.user_id = user.id
+        invitation.accepted_at = now
+        session.commit()
+
+        request.session["user_id"] = user.id
+        request.session["organization_id"] = organization.id
+
+    return RedirectResponse("/dashboard", status_code=303)

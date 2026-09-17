@@ -53,6 +53,7 @@
                         <th>Email</th>
                         <th>Role</th>
                         <th>Status</th>
+                        <th>App Access</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -87,30 +88,39 @@
                             {% endif %}
                         </td>
 
-                        <td class="has-text-right">
-                            <a
-                                href="/employees/{{ employee.id }}/edit"
-                                class="button is-small"
-                            >
-                                Edit
-                            </a>
+                        <td>
+                            {% if employee.user_id %}
+                                <span class="tag is-info is-light">Linked</span>
+                            {% else %}
+                                <span class="tag is-info is-light">Not Linked</span>
+                            {% endif %}
                         </td>
-                        {% if employee.is_active %}
+
                         <td class="has-text-right">
-                            <form
-                                method="post"
-                                action="/employees/{{ employee.id }}/invite"
-                                style="display: inline;"
-                            >
-                                <button
-                                    type="submit"
-                                    class="button is-small is-primary"
+                            <div class="buttons are-small is-justify-content-flex-end">
+                                <a
+                                    href="/employees/{{ employee.id }}/edit"
+                                    class="button is-small"
                                 >
-                                    Invite
-                                </button>
-                            </form>
-                        </td>        
-                        {% endif %}                        
+                                    Edit
+                                </a>
+
+                                {% if employee.is_active and not employee.user_id %}
+                                <form
+                                    method="post"
+                                    action="/employees/{{ employee.id }}/invite"
+                                    style="display: inline;"
+                                >
+                                    <button
+                                        type="submit"
+                                        class="button is-small is-primary"
+                                    >
+                                        Invite
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
