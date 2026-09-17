@@ -54,13 +54,20 @@ async def employees(
             status_code=303,
         )
 
-    organization_id = get_current_organization_id(request)
+    organization_id = get_management_access(request)
 
     if organization_id is None:
-        request.session.clear()
-        return RedirectResponse(
-            "/login",
-            status_code=303,
+        return templates.TemplateResponse(
+            request=request,
+            name="message.html",
+            context={
+                "title": "Employee Access Denied",
+                "paragraphs": [
+                    "Only organization owners and managers can manage employees."
+                ],
+                "show_dashboard_link": True,
+            },
+            status_code=403,
         )
 
     # Only allow the two supported views.
