@@ -76,6 +76,28 @@
                     </div>
 
                     <div class="column is-narrow">
+                        <label class="label" for="tip-report-status">Status</label>
+                        <div class="control">
+                            <div class="select">
+                                <select id="tip-report-status" name="status">
+                                    <option value="" {% if not tip_report_status %}selected{% endif %}>
+                                        All statuses
+                                    </option>
+                                    <option value="pending" {% if tip_report_status == "pending" %}selected{% endif %}>
+                                        Pending
+                                    </option>
+                                    <option value="paid" {% if tip_report_status == "paid" %}selected{% endif %}>
+                                        Paid
+                                    </option>
+                                    <option value="rejected" {% if tip_report_status == "rejected" %}selected{% endif %}>
+                                        Rejected
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="column is-narrow">
                         <label class="label" aria-hidden="true">&nbsp;</label>
                         <button type="submit" class="button is-primary">Apply</button>
                     </div>
@@ -98,6 +120,8 @@
                             <th>Employee Totals</th>
                             <th>Total Tips</th>
                             <th>Payment</th>
+                            <th>Status</th>
+                            {% if tip_report_can_process %}<th>Actions</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -154,6 +178,62 @@
                                         Cash out
                                     {% endif %}
                                 </td>
+                                <td style="white-space: nowrap;">
+                                    {% if submission.processing_status == "paid" %}
+                                        <span class="tag is-success is-light">Paid</span>
+                                    {% elif submission.processing_status == "rejected" %}
+                                        <span class="tag is-danger is-light">Rejected</span>
+                                    {% else %}
+                                        <span class="tag is-warning is-light">Pending</span>
+                                    {% endif %}
+
+                                    {% if submission.processed_at %}
+                                        <div class="is-size-7 has-text-grey mt-1">
+                                            <span
+                                                class="tip-report-time"
+                                                data-value="{{ submission.processed_at }}"
+                                            ></span>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                {% if tip_report_can_process %}
+                                    <td style="white-space: nowrap;">
+                                        {% if submission.processing_status != "paid" %}
+                                            <form
+                                                method="post"
+                                                action="/poynt/tip-submissions/{{ submission.id }}/status"
+                                                class="is-inline-block mr-1"
+                                            >
+                                                <input type="hidden" name="processing_status" value="paid">
+                                                <input type="hidden" name="return_start" value="{{ tip_report_start_date }}">
+                                                <input type="hidden" name="return_end" value="{{ tip_report_end_date }}">
+                                                <input type="hidden" name="return_payment" value="{{ tip_report_payment }}">
+                                                <input type="hidden" name="return_status" value="{{ tip_report_status }}">
+                                                <button type="submit" class="button is-small is-success is-light">
+                                                    Mark Paid
+                                                </button>
+                                            </form>
+                                        {% endif %}
+
+                                        {% if submission.processing_status != "rejected" %}
+                                            <form
+                                                method="post"
+                                                action="/poynt/tip-submissions/{{ submission.id }}/status"
+                                                class="is-inline-block"
+                                                onsubmit="return confirm('Reject this tip submission?');"
+                                            >
+                                                <input type="hidden" name="processing_status" value="rejected">
+                                                <input type="hidden" name="return_start" value="{{ tip_report_start_date }}">
+                                                <input type="hidden" name="return_end" value="{{ tip_report_end_date }}">
+                                                <input type="hidden" name="return_payment" value="{{ tip_report_payment }}">
+                                                <input type="hidden" name="return_status" value="{{ tip_report_status }}">
+                                                <button type="submit" class="button is-small is-danger is-light">
+                                                    Reject
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
                     </tbody>

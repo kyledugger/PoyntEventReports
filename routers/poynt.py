@@ -1,7 +1,7 @@
 from sku_map import fix_sku
 from categories import sku_prefix_to_category_map
 import json
-from fastapi import APIRouter, Form, Query, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -1201,6 +1201,12 @@ def _tip_submission_display(submission: TipSubmission) -> dict:
         "report_end_at": submission.report_end_at.isoformat(),
         "total_tip_cents": submission.total_tip_cents,
         "payout_method": submission.payout_method,
+        "processing_status": submission.processing_status,
+        "processed_at": (
+            submission.processed_at.isoformat()
+            if submission.processed_at
+            else None
+        ),
         "submitted_at": submission.submitted_at.isoformat(),
         "ranges": ranges,
         "employee_totals": _aggregate_tip_allocations(ranges),
@@ -1220,6 +1226,7 @@ async def tip_submission_report(
     start: str = "",
     end: str = "",
     payment: str = "",
+    status: str = "",
 ):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -1260,6 +1267,7 @@ async def tip_submission_report(
     day_start, day_end, _, _ = bounds
 
     selected_payment = payment if payment in {"cash", "paycheck"} else ""
+    selected_status = status if status in {"pending", "paid", "rejected"} else ""
 
     submission_query = select(TipSubmission).where(
         TipSubmission.organization_id == organization_id,
@@ -1270,6 +1278,11 @@ async def tip_submission_report(
     if selected_payment:
         submission_query = submission_query.where(
             TipSubmission.payout_method == selected_payment
+        )
+
+    if selected_status:
+        submission_query = submission_query.where(
+            TipSubmission.processing_status == selected_status
         )
 
     submission_query = submission_query.order_by(
@@ -1290,8 +1303,69 @@ async def tip_submission_report(
             "tip_report_can_select_date_range": can_select_date_range,
             "tip_report_validation_message": validation_message,
             "tip_report_payment": selected_payment,
+            "tip_report_status": selected_status,
+            "tip_report_can_process": can_select_date_range,
         },
     )
+
+
+@router.post("/poynt/tip-submissions/{submission_id}/status")
+async def update_tip_submission_status(
+    submission_id: int,
+    request: Request,
+    processing_status: str = Form(...),
+    return_start: str = Form(""),
+    return_end: str = Form(""),
+    return_payment: str = Form(""),
+    return_status: str = Form(""),
+):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse("/login", status_code=303)
+
+    organization_id = get_current_organization_id(request)
+    if organization_id is None:
+        request.session.clear()
+        return RedirectResponse("/login", status_code=303)
+
+    role = get_organization_role(user_id, organization_id)
+    if not role_can_view_payroll_reports(role):
+        raise HTTPException(status_code=403, detail="Payroll access is required.")
+
+    if processing_status not in {"paid", "rejected"}:
+        raise HTTPException(status_code=400, detail="Invalid tip submission status.")
+
+    with SessionLocal() as session:
+        submission = session.execute(
+            select(TipSubmission).where(
+                TipSubmission.id == submission_id,
+                TipSubmission.organization_id == organization_id,
+            )
+        ).scalar_one_or_none()
+
+        if submission is None:
+            raise HTTPException(status_code=404, detail="Tip submission not found.")
+
+        submission.processing_status = processing_status
+        submission.processed_at = datetime.utcnow()
+        submission.processed_by_user_id = user_id
+        session.commit()
+
+    return_params = {}
+    if return_start:
+        return_params["start"] = return_start
+    if return_end:
+        return_params["end"] = return_end
+    if return_payment in {"cash", "paycheck"}:
+        return_params["payment"] = return_payment
+    if return_status in {"pending", "paid", "rejected"}:
+        return_params["status"] = return_status
+
+    redirect_url = "/poynt/tip-submissions"
+    if return_params:
+        redirect_url = f"{redirect_url}?{urlencode(return_params)}"
+
+    return RedirectResponse(redirect_url, status_code=303)
 
 
 @router.post("/poynt/tip-submissions")
@@ -1341,6 +1415,9 @@ async def submit_tip_record(
         if not isinstance(tip_range.get("employees"), list) or not tip_range["employees"]:
             return RedirectResponse("/poynt/orders", status_code=303)
 
+    submitted_at = datetime.utcnow()
+    processing_status = "paid" if payout_method == "cash" else "pending"
+
     with SessionLocal() as session:
         submission = TipSubmission(
             organization_id=organization_id,
@@ -1351,7 +1428,11 @@ async def submit_tip_record(
             report_end_at=report_end,
             total_tip_cents=max(0, int(total_tip_cents)),
             payout_method=payout_method,
+            processing_status=processing_status,
+            processed_at=submitted_at if processing_status == "paid" else None,
+            processed_by_user_id=user_id if processing_status == "paid" else None,
             submission_data=json.dumps(submission_data),
+            submitted_at=submitted_at,
         )
         session.add(submission)
         session.commit()

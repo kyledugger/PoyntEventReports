@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -8,6 +8,12 @@ from database import Base
 
 class TipSubmission(Base):
     __tablename__ = "tip_submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "processing_status IN ('pending', 'paid', 'rejected')",
+            name="ck_tip_submissions_processing_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -51,6 +57,24 @@ class TipSubmission(Base):
     payout_method: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
+    )
+
+    processing_status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        nullable=False,
+        index=True,
+    )
+
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
+    processed_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
     )
 
     submission_data: Mapped[str] = mapped_column(
