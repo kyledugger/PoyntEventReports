@@ -70,7 +70,8 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ["SESSION_SECRET"],
     https_only=is_production,
-    same_site="lax"
+    same_site="lax",
+    max_age=60 * 60 * 24 * 14,
 )
 
 

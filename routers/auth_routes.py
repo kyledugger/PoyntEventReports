@@ -3,7 +3,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
 
-from auth import hash_password, validate_password, verify_password
+from auth import (
+    hash_password,
+    password_needs_rehash,
+    validate_password,
+    verify_password,
+)
 from database import SessionLocal
 from models import User, Organization, OrganizationMember
 
@@ -127,6 +132,7 @@ async def register(
 
         session.commit()
 
+        request.session.clear()
         request.session["user_id"] = user.id
         request.session["organization_id"] = organization.id
 
@@ -159,10 +165,9 @@ async def login(
             select(User).where(User.email == email)
         ).scalar_one_or_none()
 
-        password_valid = (
-            verify_password(password, user.password_hash)
-            if user
-            else False
+        password_valid = verify_password(
+            password,
+            user.password_hash if user else None,
         )
 
         logger.debug(
@@ -198,6 +203,11 @@ async def login(
                 status_code=403
             )
 
+        if password_needs_rehash(user.password_hash):
+            user.password_hash = hash_password(password)
+            session.commit()
+
+        request.session.clear()
         request.session["user_id"] = user.id
 
         if len(memberships) == 1:
