@@ -17,6 +17,9 @@ from database import SessionLocal
 from models import Employee, OrganizationInvitation, OrganizationMember, Organization, User
 from organization_context import get_current_organization_id
 from permissions import get_organization_role, role_can_manage_employees
+from security_logging import log_security_event
+
+import logging
 
 
 router = APIRouter()
@@ -554,6 +557,13 @@ async def validate_invitation(
         ).first()
 
         if result is None:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.WARNING,
+                reason="invalid_invitation",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -571,6 +581,14 @@ async def validate_invitation(
         # Defense-in-depth: make sure the invitation itself is
         # internally consistent with the employee and organization.
         if employee.organization_id != invitation.organization_id:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.ERROR,
+                organization_id=invitation.organization_id,
+                reason="organization_mismatch",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -585,6 +603,14 @@ async def validate_invitation(
 
         # Invitations are single-use.
         if invitation.accepted_at is not None:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.WARNING,
+                organization_id=organization.id,
+                reason="invitation_already_used",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -600,6 +626,14 @@ async def validate_invitation(
 
         # Invitations expire.
         if invitation.expires_at <= now:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.WARNING,
+                organization_id=organization.id,
+                reason="invitation_expired",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -615,6 +649,14 @@ async def validate_invitation(
 
         # The employee must still be active.
         if not employee.is_active:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.WARNING,
+                organization_id=organization.id,
+                reason="employee_inactive",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -952,6 +994,15 @@ async def create_account(
 
         session.commit()
 
+        log_security_event(
+            request,
+            "invitation_acceptance",
+            "succeeded",
+            user_id=user.id,
+            organization_id=organization.id,
+            account_type="new",
+        )
+
         request.session.clear()
         request.session["user_id"] = user.id
         request.session["organization_id"] = organization.id
@@ -980,6 +1031,13 @@ async def accept_invitation_with_existing_account(
         ).first()
 
         if result is None:
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "denied",
+                level=logging.WARNING,
+                reason="invalid_invitation",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_invalid.html",
@@ -1039,6 +1097,22 @@ async def accept_invitation_with_existing_account(
         )
 
         if user is None or not user.is_active or not password_valid:
+            if user is None:
+                failure_reason = "account_not_found"
+            elif not user.is_active:
+                failure_reason = "inactive_account"
+            else:
+                failure_reason = "invalid_password"
+
+            log_security_event(
+                request,
+                "invitation_authentication",
+                "failed",
+                level=logging.WARNING,
+                user_id=user.id if user else None,
+                organization_id=organization.id,
+                reason=failure_reason,
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="invitation_existing_account.html",
@@ -1046,7 +1120,7 @@ async def accept_invitation_with_existing_account(
                     "employee": employee,
                     "organization": organization,
                     "token": token,
-                    "error": "Invalid password.",
+                    "error": "Unable to verify the account credentials.",
                 },
                 status_code=401,
             )
@@ -1076,6 +1150,15 @@ async def accept_invitation_with_existing_account(
             user.password_hash = hash_password(password)
 
         session.commit()
+
+        log_security_event(
+            request,
+            "invitation_acceptance",
+            "succeeded",
+            user_id=user.id,
+            organization_id=organization.id,
+            account_type="existing",
+        )
 
         request.session.clear()
         request.session["user_id"] = user.id

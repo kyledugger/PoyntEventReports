@@ -17,6 +17,7 @@ from permissions import (
 from poynt.connection import (
     get_poynt_connection
 )
+from security_logging import log_security_event
 
 from routers.auth_routes import router as auth_router
 from routers.oauth import router as oauth_router
@@ -99,6 +100,14 @@ async def dashboard(request: Request):
         user = session.get(User, user_id)
 
         if not user:
+            log_security_event(
+                request,
+                "session",
+                "invalidated",
+                level=logging.WARNING,
+                user_id=user_id,
+                reason="user_not_found",
+            )
             request.session.clear()
 
             return RedirectResponse(
@@ -116,6 +125,15 @@ async def dashboard(request: Request):
 
     role = get_organization_role(user_id, organization_id)
     if role is None:
+        log_security_event(
+            request,
+            "organization_access",
+            "denied",
+            level=logging.WARNING,
+            user_id=user_id,
+            organization_id=organization_id,
+            reason="membership_not_found",
+        )
         request.session.pop("organization_id", None)
         return RedirectResponse("/organizations/select", status_code=303)
 

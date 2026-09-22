@@ -11,6 +11,7 @@ from auth import (
 )
 from database import SessionLocal
 from models import User, Organization, OrganizationMember
+from security_logging import log_security_event
 
 import os
 from dotenv import load_dotenv
@@ -95,11 +96,22 @@ async def register(
         ).scalar_one_or_none()
 
         if existing_user:
+            log_security_event(
+                request,
+                "registration",
+                "denied",
+                level=logging.WARNING,
+                user_id=existing_user.id,
+                reason="account_already_exists",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="register.html",
                 context={
-                    "error": "An account with that email already exists.",
+                    "error": (
+                        "We could not create an account with those details. "
+                        "If you may already have an account, try signing in."
+                    ),
                     "organization_name": organization_name,
                     "email": email,
                     "phone": phone or "",
@@ -132,6 +144,14 @@ async def register(
 
         session.commit()
 
+        log_security_event(
+            request,
+            "registration",
+            "succeeded",
+            user_id=user.id,
+            organization_id=organization.id,
+        )
+
         request.session.clear()
         request.session["user_id"] = user.id
         request.session["organization_id"] = organization.id
@@ -158,8 +178,6 @@ async def login(
 ):
     email = email.strip().lower()
 
-    logger.debug("LOGIN: submitted email=%r", email)
-
     with SessionLocal() as session:
         user = session.execute(
             select(User).where(User.email == email)
@@ -170,14 +188,22 @@ async def login(
             user.password_hash if user else None,
         )
 
-        logger.debug(
-            "LOGIN: user found=%s, user_id=%s, password valid=%s",
-            user is not None,
-            user.id if user else None,
-            password_valid,
-        )
-
         if not user or not password_valid or not user.is_active:
+            if user is None:
+                failure_reason = "unknown_account"
+            elif not user.is_active:
+                failure_reason = "inactive_account"
+            else:
+                failure_reason = "invalid_password"
+
+            log_security_event(
+                request,
+                "login",
+                "failed",
+                level=logging.WARNING,
+                user_id=user.id if user else None,
+                reason=failure_reason,
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
@@ -194,11 +220,22 @@ async def login(
         ).scalars().all()
 
         if not memberships:
+            log_security_event(
+                request,
+                "login",
+                "denied",
+                level=logging.WARNING,
+                user_id=user.id,
+                reason="no_organization_membership",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="login.html",
                 context={
-                    "error": "No organization is associated with this account."
+                    "error": (
+                        "Unable to sign in. Please contact support "
+                        "if this continues."
+                    )
                 },
                 status_code=403
             )
@@ -206,6 +243,12 @@ async def login(
         if password_needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
             session.commit()
+            log_security_event(
+                request,
+                "password_hash_upgrade",
+                "succeeded",
+                user_id=user.id,
+            )
 
         request.session.clear()
         request.session["user_id"] = user.id
@@ -217,6 +260,19 @@ async def login(
             # Do not silently choose an organization for a multi-organization user.
             request.session.pop("organization_id", None)
             destination = "/organizations/select"
+
+        log_security_event(
+            request,
+            "login",
+            "succeeded",
+            user_id=user.id,
+            organization_id=(
+                memberships[0].organization_id
+                if len(memberships) == 1
+                else None
+            ),
+            membership_count=len(memberships),
+        )
 
     return RedirectResponse(
         destination,
@@ -233,6 +289,14 @@ async def select_organization_page(request: Request):
     with SessionLocal() as session:
         user = session.get(User, user_id)
         if not user or not user.is_active:
+            log_security_event(
+                request,
+                "session",
+                "invalidated",
+                level=logging.WARNING,
+                user_id=user_id,
+                reason="missing_or_inactive_user",
+            )
             request.session.clear()
             return RedirectResponse("/login", status_code=303)
 
@@ -243,6 +307,14 @@ async def select_organization_page(request: Request):
         ).scalars().all()
 
         if not memberships:
+            log_security_event(
+                request,
+                "session",
+                "invalidated",
+                level=logging.WARNING,
+                user_id=user_id,
+                reason="no_organization_membership",
+            )
             request.session.clear()
             return RedirectResponse("/login", status_code=303)
 
@@ -279,6 +351,14 @@ async def select_organization(
     with SessionLocal() as session:
         user = session.get(User, user_id)
         if not user or not user.is_active:
+            log_security_event(
+                request,
+                "session",
+                "invalidated",
+                level=logging.WARNING,
+                user_id=user_id,
+                reason="missing_or_inactive_user",
+            )
             request.session.clear()
             return RedirectResponse("/login", status_code=303)
 
@@ -290,6 +370,15 @@ async def select_organization(
         ).scalar_one_or_none()
 
         if not membership:
+            log_security_event(
+                request,
+                "organization_selection",
+                "denied",
+                level=logging.WARNING,
+                user_id=user_id,
+                organization_id=organization_id,
+                reason="membership_not_found",
+            )
             return templates.TemplateResponse(
                 request=request,
                 name="message.html",
@@ -301,12 +390,30 @@ async def select_organization(
             )
 
         request.session["organization_id"] = membership.organization_id
+        log_security_event(
+            request,
+            "organization_selection",
+            "succeeded",
+            user_id=user_id,
+            organization_id=membership.organization_id,
+        )
 
     return RedirectResponse("/dashboard", status_code=303)
 
 
 @router.post("/logout")
 async def logout(request: Request):
+    user_id = request.session.get("user_id")
+    organization_id = request.session.get("organization_id")
+    log_security_event(
+        request,
+        "logout",
+        "succeeded",
+        user_id=user_id if isinstance(user_id, int) else None,
+        organization_id=(
+            organization_id if isinstance(organization_id, int) else None
+        ),
+    )
     request.session.clear()
 
     return RedirectResponse(
