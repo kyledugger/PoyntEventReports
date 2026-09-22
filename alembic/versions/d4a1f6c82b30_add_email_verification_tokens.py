@@ -15,45 +15,72 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
-        "user_security_tokens",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("purpose", sa.String(length=50), nullable=False),
-        sa.Column("token_hash", sa.String(length=64), nullable=False),
-        sa.Column("expires_at", sa.DateTime(), nullable=False),
-        sa.Column("used_at", sa.DateTime(), nullable=True),
-        sa.Column(
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    table_name = "user_security_tokens"
+
+    # Application startup currently calls Base.metadata.create_all(). That can
+    # create this table before Alembic runs, so adopt the matching table rather
+    # than failing with DuplicateTable.
+    if not inspector.has_table(table_name):
+        op.create_table(
+            table_name,
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("user_id", sa.Integer(), nullable=False),
+            sa.Column("purpose", sa.String(length=50), nullable=False),
+            sa.Column("token_hash", sa.String(length=64), nullable=False),
+            sa.Column("expires_at", sa.DateTime(), nullable=False),
+            sa.Column("used_at", sa.DateTime(), nullable=True),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+            sa.ForeignKeyConstraint(
+                ["user_id"],
+                ["users.id"],
+                ondelete="CASCADE",
+            ),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        existing_indexes = set()
+    else:
+        required_columns = {
+            "id",
+            "user_id",
+            "purpose",
+            "token_hash",
+            "expires_at",
+            "used_at",
             "created_at",
-            sa.DateTime(),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            ondelete="CASCADE",
-        ),
-        sa.PrimaryKeyConstraint("id"),
+        }
+        existing_columns = {
+            column["name"] for column in inspector.get_columns(table_name)
+        }
+        missing_columns = required_columns - existing_columns
+        if missing_columns:
+            raise RuntimeError(
+                "Existing user_security_tokens table has an unexpected "
+                f"schema; missing columns: {sorted(missing_columns)}"
+            )
+        existing_indexes = {
+            index["name"] for index in inspector.get_indexes(table_name)
+        }
+
+    indexes = (
+        ("ix_user_security_tokens_user_id", ["user_id"], False),
+        ("ix_user_security_tokens_purpose", ["purpose"], False),
+        ("ix_user_security_tokens_token_hash", ["token_hash"], True),
     )
-    op.create_index(
-        "ix_user_security_tokens_user_id",
-        "user_security_tokens",
-        ["user_id"],
-        unique=False,
-    )
-    op.create_index(
-        "ix_user_security_tokens_purpose",
-        "user_security_tokens",
-        ["purpose"],
-        unique=False,
-    )
-    op.create_index(
-        "ix_user_security_tokens_token_hash",
-        "user_security_tokens",
-        ["token_hash"],
-        unique=True,
-    )
+    for index_name, columns, unique in indexes:
+        if index_name not in existing_indexes:
+            op.create_index(
+                index_name,
+                table_name,
+                columns,
+                unique=unique,
+            )
 
     # Verification begins with this deployment. Preserve access for accounts
     # that existed before it by marking them verified during the migration.
