@@ -11,7 +11,13 @@ from auth import (
 )
 from database import SessionLocal
 from models import User, Organization, OrganizationMember
+from email_service import EmailDeliveryError, send_verification_email
 from security_logging import log_security_event
+from security_tokens import (
+    EMAIL_VERIFICATION,
+    EMAIL_VERIFICATION_LIFETIME,
+    create_security_token,
+)
 
 import os
 from dotenv import load_dotenv
@@ -142,7 +148,39 @@ async def register(
         )
         session.add(membership)
 
-        session.commit()
+        raw_token = create_security_token(
+            session,
+            user.id,
+            EMAIL_VERIFICATION,
+            EMAIL_VERIFICATION_LIFETIME,
+        )
+        try:
+            send_verification_email(user.email, raw_token)
+            session.commit()
+        except EmailDeliveryError:
+            session.rollback()
+            logger.exception("Registration verification email delivery failed")
+            log_security_event(
+                request,
+                "registration",
+                "failed",
+                level=logging.ERROR,
+                reason="email_delivery_failed",
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="register.html",
+                context={
+                    "error": (
+                        "We could not send a verification email. "
+                        "Please try again shortly."
+                    ),
+                    "organization_name": organization_name,
+                    "email": email,
+                    "phone": phone or "",
+                },
+                status_code=503,
+            )
 
         log_security_event(
             request,
@@ -153,20 +191,32 @@ async def register(
         )
 
         request.session.clear()
-        request.session["user_id"] = user.id
-        request.session["organization_id"] = organization.id
 
-    return RedirectResponse(
-        "/dashboard",
-        status_code=303
+    return templates.TemplateResponse(
+        request=request,
+        name="message.html",
+        context={
+            "title": "Check Your Email",
+            "paragraphs": [
+                "We sent a verification link to your email address. "
+                "Verify your email before signing in. The link expires in 24 hours."
+            ],
+            "login_link": True,
+        },
     )
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
+    message = None
+    if request.query_params.get("verified") == "1":
+        message = "Your email is verified. You can now sign in."
+    elif request.query_params.get("password_reset") == "1":
+        message = "Your password was reset. You can now sign in."
     return templates.TemplateResponse(
         request=request,
-        name="login.html"
+        name="login.html",
+        context={"message": message},
     )
 
 
@@ -211,6 +261,27 @@ async def login(
                     "error": "Invalid email or password."
                 },
                 status_code=401
+            )
+
+        if user.email_verified_at is None:
+            log_security_event(
+                request,
+                "login",
+                "denied",
+                level=logging.WARNING,
+                user_id=user.id,
+                reason="email_not_verified",
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="login.html",
+                context={
+                    "error": (
+                        "Verify your email before signing in. "
+                        "You can request a new verification link below."
+                    )
+                },
+                status_code=403,
             )
 
         memberships = session.execute(

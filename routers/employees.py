@@ -14,10 +14,16 @@ from auth import (
 )
 
 from database import SessionLocal
+from email_service import EmailDeliveryError, send_verification_email
 from models import Employee, OrganizationInvitation, OrganizationMember, Organization, User
 from organization_context import get_current_organization_id
 from permissions import get_organization_role, role_can_manage_employees
 from security_logging import log_security_event
+from security_tokens import (
+    EMAIL_VERIFICATION,
+    EMAIL_VERIFICATION_LIFETIME,
+    create_security_token,
+)
 
 import logging
 
@@ -992,7 +998,41 @@ async def create_account(
 
         invitation.accepted_at = now
 
-        session.commit()
+        raw_verification_token = create_security_token(
+            session,
+            user.id,
+            EMAIL_VERIFICATION,
+            EMAIL_VERIFICATION_LIFETIME,
+        )
+        try:
+            send_verification_email(user.email, raw_verification_token)
+            session.commit()
+        except EmailDeliveryError:
+            session.rollback()
+            logger.exception("Invitation verification email delivery failed")
+            log_security_event(
+                request,
+                "invitation_acceptance",
+                "failed",
+                level=logging.ERROR,
+                organization_id=organization.id,
+                reason="email_delivery_failed",
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_create_account.html",
+                context={
+                    "organization": organization,
+                    "employee": employee,
+                    "invitation": invitation,
+                    "token": token,
+                    "error": (
+                        "We could not send a verification email. "
+                        "Please try again shortly."
+                    ),
+                },
+                status_code=503,
+            )
 
         log_security_event(
             request,
@@ -1004,12 +1044,18 @@ async def create_account(
         )
 
         request.session.clear()
-        request.session["user_id"] = user.id
-        request.session["organization_id"] = organization.id
 
-    return RedirectResponse(
-        "/dashboard",
-        status_code=303,
+    return templates.TemplateResponse(
+        request=request,
+        name="message.html",
+        context={
+            "title": "Check Your Email",
+            "paragraphs": [
+                "We sent a verification link to your email address. "
+                "Verify your email before signing in."
+            ],
+            "login_link": True,
+        },
     )    
 
 @router.post("/invite/{token}/existing-account")
@@ -1123,6 +1169,28 @@ async def accept_invitation_with_existing_account(
                     "error": "Unable to verify the account credentials.",
                 },
                 status_code=401,
+            )
+
+        if user.email_verified_at is None:
+            log_security_event(
+                request,
+                "invitation_authentication",
+                "denied",
+                level=logging.WARNING,
+                user_id=user.id,
+                organization_id=organization.id,
+                reason="email_not_verified",
+            )
+            return templates.TemplateResponse(
+                request=request,
+                name="invitation_existing_account.html",
+                context={
+                    "employee": employee,
+                    "organization": organization,
+                    "token": token,
+                    "error": "Verify your email before accepting this invitation.",
+                },
+                status_code=403,
             )
 
         membership = session.execute(

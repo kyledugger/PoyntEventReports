@@ -23,6 +23,7 @@ from routers.auth_routes import router as auth_router
 from routers.oauth import router as oauth_router
 from routers.poynt import router as poynt_router
 from routers.employees import router as employees_router
+from routers.account_security import router as account_security_router
 
 dotenv_file = os.getenv("DOTENV_FILE", ".env")
 load_dotenv(dotenv_file)
@@ -63,6 +64,7 @@ app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(poynt_router)
 app.include_router(employees_router)
+app.include_router(account_security_router)
 
 Base.metadata.create_all(bind=engine)
 
