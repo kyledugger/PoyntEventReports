@@ -5,7 +5,7 @@ from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from poynt.token import exchange_authorization_code
 from zoneinfo import ZoneInfo
@@ -727,12 +727,62 @@ def get_orders_date_range(start, end):
     if span_seconds:
         span_seconds = span_seconds.total_seconds()
     
+    start_at_utc = start_at_date.astimezone(timezone.utc)
+    end_at_utc = end_at_date.astimezone(timezone.utc)
+
     return {
-        "start_at": start_at_date.isoformat(),
-        "end_at": end_at_date.isoformat(),
+        "start_at": (
+            start_at_utc
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z")
+        ),
+        "end_at": (
+            end_at_utc
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z")
+        ),
         "span_seconds": span_seconds,
     }
 
+
+def filter_orders_by_created_at(orders, start_at, end_at):
+    start_time = datetime.fromisoformat(
+        start_at.replace("Z", "+00:00")
+    )
+    end_time = datetime.fromisoformat(
+        end_at.replace("Z", "+00:00")
+    )
+
+    filtered_orders = []
+
+    for order in orders:
+        created_at = order.get("createdAt")
+
+        if not created_at:
+            continue
+
+        try:
+            created_time = datetime.fromisoformat(
+                created_at.replace("Z", "+00:00")
+            )
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid createdAt timestamp for order %s: %s",
+                order.get("id"),
+                created_at,
+            )
+            continue
+
+        if start_time <= created_time <= end_time:
+            filtered_orders.append(order)
+
+    logger.info(
+        "Created-at filtering reduced %d orders to %d orders.",
+        len(orders),
+        len(filtered_orders),
+    )
+
+    return filtered_orders
 
 async def fetch_poynt_orders(
     credentials,
@@ -1506,8 +1556,9 @@ async def poynt_orders(
             },
         )
 
-    start_at = order_date_params['start_at']
-    end_at = order_date_params['end_at']
+    start_at = order_date_params["start_at"]
+    end_at = order_date_params["end_at"] 
+
     report_span_seconds = order_date_params['span_seconds'] 
 
     # preserve inputs    
@@ -1536,12 +1587,25 @@ async def poynt_orders(
         )
 
     try:
+        logger.info(
+            "Poynt order query: startAt=%s, endAt=%s",
+            start_at,
+            end_at,
+        )        
+
         orders = await fetch_poynt_orders(
             credentials,
             organization_id,
             start_at,
             end_at,
         )
+
+        orders = filter_orders_by_created_at(
+            orders,
+            start_at,
+            end_at,
+        )        
+
 
         if not orders:
             logger.info(
