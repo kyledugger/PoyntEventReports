@@ -33,12 +33,25 @@ logger = logging.getLogger(__name__)
 
 GENERIC_RESET_MESSAGE = (
     "If an account is eligible, a password reset link will be sent. "
-    "The link expires in 30 minutes."
+    "The link expires in 30 minutes. If it does not arrive within a few "
+    "minutes, check your spam folder, try again, or contact support."
 )
 GENERIC_VERIFICATION_MESSAGE = (
     "If that address belongs to an unverified account, a new verification "
-    "link will be sent."
+    "link will be sent. If it does not arrive within a few minutes, check "
+    "your spam folder, try again, or contact support."
 )
+
+
+def _log_email_delivery_failure(event: str, error: EmailDeliveryError) -> None:
+    logger.error(
+        "EMAIL_DELIVERY_EVENT event=%s outcome=failed provider=postmark "
+        "http_status=%s provider_error_code=%s provider_message=%s",
+        event,
+        error.status_code,
+        error.postmark_error_code,
+        error.postmark_message,
+    )
 
 
 def _send_password_reset_if_eligible(email: str) -> None:
@@ -56,9 +69,9 @@ def _send_password_reset_if_eligible(email: str) -> None:
         try:
             send_password_reset_email(user.email, raw_token)
             session.commit()
-        except EmailDeliveryError:
+        except EmailDeliveryError as exc:
             session.rollback()
-            logger.exception("Password reset email delivery failed")
+            _log_email_delivery_failure("password_reset", exc)
 
 
 def _send_verification_if_eligible(email: str) -> None:
@@ -79,9 +92,9 @@ def _send_verification_if_eligible(email: str) -> None:
         try:
             send_verification_email(user.email, raw_token)
             session.commit()
-        except EmailDeliveryError:
+        except EmailDeliveryError as exc:
             session.rollback()
-            logger.exception("Verification email delivery failed")
+            _log_email_delivery_failure("email_verification", exc)
 
 
 @router.get("/forgot-password", response_class=HTMLResponse)

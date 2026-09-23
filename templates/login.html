@@ -36,6 +36,12 @@
                         </div>
                     {% endif %}
 
+                    {% if message %}
+                        <div class="notification is-success is-light">
+                            {{ message }}
+                        </div>
+                    {% endif %}
+
                     <form method="post">
 
                         <div class="field">
@@ -74,6 +80,11 @@
                                     required
                                 >
                             </div>
+                            <p class="help has-text-right mt-2">
+                                <a href="/forgot-password">
+                                    Forgot your password?
+                                </a>
+                            </p>
                         </div>
 
                         <div class="field mt-5">
@@ -88,6 +99,12 @@
                         </div>
 
                     </form>
+
+                    <div class="has-text-centered mt-4">
+                        <a href="/resend-verification">
+                            Resend verification email
+                        </a>
+                    </div>
 
                     <div class="has-text-centered mt-5">
                         <p>

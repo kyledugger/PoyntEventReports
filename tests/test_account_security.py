@@ -125,6 +125,38 @@ class PostmarkEmailTests(unittest.TestCase):
         with self.assertRaises(EmailDeliveryError):
             send_password_reset_email("owner@example.com", "token")
 
+    @patch.dict(
+        os.environ,
+        {
+            "POSTMARK_SERVER_TOKEN": "test-token",
+            "EMAIL_FROM": "support@example.com",
+            "APP_BASE_URL": "https://foodtruckworks.com",
+        },
+        clear=False,
+    )
+    @patch("email_service.httpx.post")
+    def test_postmark_error_details_are_captured_and_email_is_redacted(self, post):
+        response = Mock()
+        response.is_success = False
+        response.status_code = 422
+        response.json.return_value = {
+            "ErrorCode": 406,
+            "Message": "Recipient owner@example.com is not allowed in test mode.",
+        }
+        post.return_value = response
+
+        with self.assertRaises(EmailDeliveryError) as raised:
+            send_password_reset_email("owner@example.com", "raw-secret-token")
+
+        error = raised.exception
+        self.assertEqual(error.status_code, 422)
+        self.assertEqual(error.postmark_error_code, 406)
+        self.assertEqual(
+            error.postmark_message,
+            "Recipient [redacted-email] is not allowed in test mode.",
+        )
+        self.assertNotIn("owner@example.com", error.postmark_message)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 import html
 import os
+import re
 
 import httpx
 
@@ -8,7 +9,31 @@ POSTMARK_EMAIL_URL = "https://api.postmarkapp.com/email"
 
 
 class EmailDeliveryError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        postmark_error_code: int | None = None,
+        postmark_message: str | None = None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.postmark_error_code = postmark_error_code
+        self.postmark_message = postmark_message
+
+
+def _safe_postmark_message(message: object) -> str | None:
+    if not isinstance(message, str) or not message:
+        return None
+    single_line = message.replace("\r", " ").replace("\n", " ")
+    redacted = re.sub(
+        r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}",
+        "[redacted-email]",
+        single_line,
+        flags=re.IGNORECASE,
+    )
+    return redacted[:300]
 
 
 def _configuration() -> tuple[str, str, str]:
@@ -38,9 +63,27 @@ def _send_email(to_address: str, subject: str, text_body: str, html_body: str) -
             },
             timeout=10.0,
         )
-        response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise EmailDeliveryError("Postmark did not accept the email") from exc
+    except httpx.RequestError as exc:
+        raise EmailDeliveryError("Unable to connect to Postmark") from exc
+
+    if response.is_success:
+        return
+
+    error_code = None
+    postmark_message = None
+    try:
+        error_payload = response.json()
+        error_code = error_payload.get("ErrorCode")
+        postmark_message = _safe_postmark_message(error_payload.get("Message"))
+    except (ValueError, AttributeError):
+        pass
+
+    raise EmailDeliveryError(
+        "Postmark did not accept the email",
+        status_code=response.status_code,
+        postmark_error_code=error_code,
+        postmark_message=postmark_message,
+    )
 
 
 def send_verification_email(to_address: str, raw_token: str) -> None:
