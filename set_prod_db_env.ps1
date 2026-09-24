@@ -1,0 +1,1 @@
+$env:DATABASE_URL = (Get-Content .env.local-prod-db | Where-Object { $_ -match '^DATABASE_URL=' }) -replace '^DATABASE_URL=', ''                                      
