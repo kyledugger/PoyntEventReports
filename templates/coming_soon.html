@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Food Truck Works - Coming Soon{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-7-tablet is-6-desktop">
+                <div class="box has-text-centered">
+                    <picture>
+                        <source
+                            srcset="/static/images/food-truck-works-logo-dark.png"
+                            media="(prefers-color-scheme: dark)"
+                        >
+                        <img
+                            src="/static/images/food-truck-works-logo.png"
+                            alt="Food Truck Works"
+                            class="ftw-logo ftw-logo--auth"
+                            width="1039"
+                            height="883"
+                        >
+                    </picture>
+
+                    <h1 class="title is-3">Coming Soon</h1>
+                    <p class="subtitle is-5">
+                        Tools built for food truck operators to book, manage,
+                        and grow their businesses.
+                    </p>
+                    <p class="mb-5">
+                        Food Truck Works is currently in private testing.
+                    </p>
+
+                    <a href="/login" class="button is-primary">
+                        Existing User Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -2,6 +2,8 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from fastapi.templating import Jinja2Templates
+import secrets
+import time
 
 from auth import (
     hash_password,
@@ -34,9 +36,94 @@ configure_logging()
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
+ORGANIZATION_REGISTRATION_SESSION_KEY = "organization_registration_authorized_at"
+ORGANIZATION_REGISTRATION_ACCESS_SECONDS = 30 * 60
+
+
+def organization_registration_is_authorized(
+    request: Request,
+    *,
+    now: float | None = None,
+    environment: str | None = None,
+) -> bool:
+    environment = environment or os.getenv("ENVIRONMENT", "local")
+    if environment != "production":
+        return True
+
+    authorized_at = request.session.get(ORGANIZATION_REGISTRATION_SESSION_KEY)
+    if not isinstance(authorized_at, (int, float)):
+        return False
+
+    age = (time.time() if now is None else now) - authorized_at
+    return 0 <= age <= ORGANIZATION_REGISTRATION_ACCESS_SECONDS
+
+
+@router.get("/organization-registration-access", response_class=HTMLResponse)
+async def organization_registration_access_page(request: Request):
+    if organization_registration_is_authorized(request):
+        return RedirectResponse("/register", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="registration_access.html",
+    )
+
+
+@router.post("/organization-registration-access", response_class=HTMLResponse)
+async def organization_registration_access(
+    request: Request,
+    access_code: str = Form(...),
+):
+    configured_code = os.getenv("ORG_REGISTRATION_ACCESS_CODE", "")
+    access_code = access_code.strip()
+    if len(configured_code) < 32:
+        logger.error(
+            "Organization registration access is unavailable because "
+            "ORG_REGISTRATION_ACCESS_CODE is missing or too short"
+        )
+        log_security_event(
+            request,
+            "organization_registration_access",
+            "failed",
+            level=logging.ERROR,
+            reason="access_code_not_configured",
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="registration_access.html",
+            context={"error": "Registration access is not currently available."},
+            status_code=503,
+        )
+
+    if len(access_code) > 256 or not secrets.compare_digest(
+        access_code, configured_code
+    ):
+        log_security_event(
+            request,
+            "organization_registration_access",
+            "denied",
+            level=logging.WARNING,
+            reason="invalid_access_code",
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="registration_access.html",
+            context={"error": "The access code is not valid."},
+            status_code=401,
+        )
+
+    request.session[ORGANIZATION_REGISTRATION_SESSION_KEY] = int(time.time())
+    log_security_event(
+        request,
+        "organization_registration_access",
+        "succeeded",
+    )
+    return RedirectResponse("/register", status_code=303)
+
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
+    if not organization_registration_is_authorized(request):
+        return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="register.html"
@@ -54,6 +141,16 @@ async def register(
     password: str = Form(...),
     confirm_password: str = Form(...)
 ):
+    if not organization_registration_is_authorized(request):
+        log_security_event(
+            request,
+            "registration",
+            "denied",
+            level=logging.WARNING,
+            reason="registration_not_authorized",
+        )
+        return RedirectResponse("/", status_code=303)
+
     organization_name = organization_name.strip()
     first_name = first_name.strip()
     last_name = last_name.strip()

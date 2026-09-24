@@ -32,3 +32,14 @@ and marks the accounts that exist at migration time as verified. Revision
 workflow. Revision `f1c3a8d72b40` adds account-level first and last names and
 backfills users already linked to employee records. Review the target database
 before running migrations. Do not store the Postmark token in this repository.
+
+## Private organization registration
+
+Production organization registration is closed to the general public. Set
+`ORG_REGISTRATION_ACCESS_CODE` in Render to a randomly generated value of at
+least 32 characters. Authorized production testing begins at
+`/organization-registration-access`; successful entry opens `/register` for
+that signed browser session for 30 minutes. Do not put the access code in a URL,
+source code, logs, or this repository. Local development registration remains
+available without the access code. Generate a suitable value with
+`python -c "import secrets; print(secrets.token_urlsafe(32))"`.

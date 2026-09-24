@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Registration Access - Food Truck Works{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-5-tablet is-4-desktop">
+                <div class="box">
+                    <picture>
+                        <source
+                            srcset="/static/images/food-truck-works-logo-dark.png"
+                            media="(prefers-color-scheme: dark)"
+                        >
+                        <img
+                            src="/static/images/food-truck-works-logo.png"
+                            alt="Food Truck Works"
+                            class="ftw-logo ftw-logo--auth"
+                            width="1039"
+                            height="883"
+                        >
+                    </picture>
+
+                    <h1 class="title is-4 has-text-centered">
+                        Organization Registration Access
+                    </h1>
+                    <p class="subtitle is-6 has-text-centered">
+                        Enter the private testing access code.
+                    </p>
+
+                    {% if error %}
+                        <div class="notification is-danger is-light">
+                            {{ error }}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" autocomplete="off">
+                        <div class="field">
+                            <label class="label" for="access_code">Access Code</label>
+                            <div class="control">
+                                <input
+                                    class="input"
+                                    type="password"
+                                    id="access_code"
+                                    name="access_code"
+                                    maxlength="256"
+                                    autocomplete="off"
+                                    required
+                                    autofocus
+                                >
+                            </div>
+                        </div>
+                        <button type="submit" class="button is-primary is-fullwidth">
+                            Continue to Registration
+                        </button>
+                    </form>
+
+                    <p class="has-text-centered mt-5">
+                        <a href="/">Return to Food Truck Works</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
