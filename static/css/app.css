@@ -73,8 +73,10 @@ body {
 }
 
 .ftw-dashboard-welcome {
+    align-self: stretch;
+    width: 100%;
     margin: 0;
-    text-align: right;
+    text-align: right !important;
 }
 
 @media (max-width: 768px) {
@@ -93,7 +95,7 @@ body {
     }
 
     .ftw-dashboard-welcome {
-        text-align: left;
+        text-align: left !important;
     }
 }
 
