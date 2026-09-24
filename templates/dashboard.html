@@ -9,13 +9,7 @@
 
         <nav class="ftw-dashboard-header mb-5">
             <div class="ftw-dashboard-identity">
-                <div>
-                    {% include "_app_brand.html" %}
-
-                    <p class="subtitle is-6">
-                        Welcome, {{ user.display_name }}
-                    </p>
-                </div>
+                {% include "_app_brand.html" %}
             </div>
 
             <div class="ftw-dashboard-actions">
@@ -39,6 +33,10 @@
                         <button type="submit" class="button is-light">Log Out</button>
                     </form>
                 </div>
+
+                <p class="subtitle is-6 ftw-dashboard-welcome">
+                    Welcome, {{ user.display_name }}
+                </p>
             </div>
         </nav>
 

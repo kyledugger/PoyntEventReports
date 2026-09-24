@@ -44,7 +44,7 @@ body {
 
 .ftw-dashboard-header {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 1.5rem;
     width: 100%;
@@ -54,18 +54,46 @@ body {
     min-width: 0;
 }
 
+.ftw-dashboard-identity .ftw-app-brand {
+    display: block;
+    margin-bottom: 0;
+}
+
 .ftw-dashboard-actions {
+    display: flex;
     flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
     margin-left: auto;
+}
+
+.ftw-dashboard-actions .buttons {
+    justify-content: flex-end;
+    margin-bottom: 0.35rem;
+}
+
+.ftw-dashboard-welcome {
+    margin: 0;
+    text-align: right;
 }
 
 @media (max-width: 768px) {
     .ftw-dashboard-header {
         flex-direction: column;
+        align-items: stretch;
     }
 
     .ftw-dashboard-actions {
+        align-items: flex-start;
         margin-left: 0;
+    }
+
+    .ftw-dashboard-actions .buttons {
+        justify-content: flex-start;
+    }
+
+    .ftw-dashboard-welcome {
+        text-align: left;
     }
 }
 
