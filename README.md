@@ -25,8 +25,10 @@ Set these environment variables in Render:
 - `EMAIL_FROM`: a sender address on a Postmark-verified domain
 - `APP_BASE_URL`: the public origin, for example `https://foodtruckworks.com`
 
-Before deploying the verification requirement, run `alembic upgrade head`
-against the intended database. Revision `d4a1f6c82b30` creates the
-security-token table and marks the accounts that exist at migration time as
-verified. Review the target database before running the migration. Do not store
-the Postmark token in this repository.
+Before deploying account security changes, run `alembic upgrade head` against
+the intended database. Revision `d4a1f6c82b30` creates the security-token table
+and marks the accounts that exist at migration time as verified. Revision
+`e7b2c4d91a60` adds the pending-email field used by the verified email-change
+workflow. Revision `f1c3a8d72b40` adds account-level first and last names and
+backfills users already linked to employee records. Review the target database
+before running migrations. Do not store the Postmark token in this repository.

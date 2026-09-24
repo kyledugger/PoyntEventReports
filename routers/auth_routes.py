@@ -47,14 +47,26 @@ async def register_page(request: Request):
 async def register(
     request: Request,
     organization_name: str = Form(...),
+    first_name: str = Form(...),
+    last_name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(""),
     password: str = Form(...),
     confirm_password: str = Form(...)
 ):
     organization_name = organization_name.strip()
+    first_name = first_name.strip()
+    last_name = last_name.strip()
     email = email.strip().lower()
     phone = phone.strip() or None
+
+    form_values = {
+        "organization_name": organization_name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone": phone or "",
+    }
 
     if not organization_name:
         return templates.TemplateResponse(
@@ -62,11 +74,28 @@ async def register(
             name="register.html",
             context={
                 "error": "Organization name is required.",
-                "organization_name": organization_name,
-                "email": email,
-                "phone": phone or "",
+                **form_values,
             },
             status_code=400
+        )
+
+    if not first_name or not last_name:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"error": "First and last name are required.", **form_values},
+            status_code=400,
+        )
+
+    if len(first_name) > 100 or len(last_name) > 100:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "error": "First and last name must be 100 characters or fewer.",
+                **form_values,
+            },
+            status_code=400,
         )
 
     if password != confirm_password:
@@ -75,9 +104,7 @@ async def register(
             name="register.html",
             context={
                 "error": "Passwords do not match.",
-                "organization_name": organization_name,
-                "email": email,
-                "phone": phone or "",
+                **form_values,
             },
             status_code=400
         )
@@ -89,9 +116,7 @@ async def register(
             name="register.html",
             context={
                 "error": password_error,
-                "organization_name": organization_name,
-                "email": email,
-                "phone": phone or "",
+                **form_values,
             },
             status_code=400
         )
@@ -118,9 +143,7 @@ async def register(
                         "We could not create an account with those details. "
                         "If you may already have an account, try signing in."
                     ),
-                    "organization_name": organization_name,
-                    "email": email,
-                    "phone": phone or "",
+                    **form_values,
                 },
                 status_code=400
             )
@@ -128,6 +151,8 @@ async def register(
         # User, organization, and owner membership are created
         # in the same transaction.
         user = User(
+            first_name=first_name,
+            last_name=last_name,
             email=email,
             phone=phone,
             password_hash=hash_password(password)
@@ -175,9 +200,7 @@ async def register(
                         "We could not send a verification email. "
                         "Please try again shortly."
                     ),
-                    "organization_name": organization_name,
-                    "email": email,
-                    "phone": phone or "",
+                    **form_values,
                 },
                 status_code=503,
             )
@@ -213,6 +236,8 @@ async def login_page(request: Request):
         message = "Your email is verified. You can now sign in."
     elif request.query_params.get("password_reset") == "1":
         message = "Your password was reset. You can now sign in."
+    elif request.query_params.get("email_changed") == "1":
+        message = "Your email was changed. Sign in with your new email address."
     return templates.TemplateResponse(
         request=request,
         name="login.html",

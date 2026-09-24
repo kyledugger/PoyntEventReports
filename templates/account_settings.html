@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Account Settings - Food Truck Works{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="container">
+        <div class="columns is-centered">
+            <div class="column is-8-tablet is-7-desktop">
+                {% include "_app_brand.html" %}
+
+                <div class="level mb-5">
+                    <div class="level-left">
+                        <div>
+                            <h1 class="title mb-1">Account Settings</h1>
+                            <p class="subtitle is-6">Manage your profile and login security.</p>
+                        </div>
+                    </div>
+                    <div class="level-right">
+                        <a href="/dashboard" class="button is-light">Return to Dashboard</a>
+                    </div>
+                </div>
+
+                {% if error %}
+                    <div class="notification is-danger is-light">{{ error }}</div>
+                {% endif %}
+                {% if message %}
+                    <div class="notification is-success is-light">{{ message }}</div>
+                {% endif %}
+
+                <div class="box">
+                    <h2 class="title is-4">Profile</h2>
+                    <form method="post" action="/account/profile">
+                        <div class="columns">
+                            <div class="column">
+                                <div class="field">
+                                    <label class="label" for="first_name">First Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="first_name"
+                                               name="first_name"
+                                               value="{{ user.first_name or '' }}"
+                                               maxlength="100" autocomplete="given-name" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="field">
+                                    <label class="label" for="last_name">Last Name</label>
+                                    <div class="control">
+                                        <input class="input" type="text" id="last_name"
+                                               name="last_name"
+                                               value="{{ user.last_name or '' }}"
+                                               maxlength="100" autocomplete="family-name" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="button is-primary">Save Profile</button>
+                    </form>
+                </div>
+
+                <div class="box">
+                    <h2 class="title is-4">Login Email</h2>
+                    <p class="mb-4">
+                        Current email: <strong>{{ user.email }}</strong>
+                    </p>
+                    {% if user.pending_email %}
+                        <div class="notification is-info is-light">
+                            Waiting for confirmation from <strong>{{ user.pending_email }}</strong>.
+                            Your current email remains active until that address is confirmed.
+                        </div>
+                    {% endif %}
+
+                    <form method="post" action="/account/email" autocomplete="off">
+                        <div class="field">
+                            <label class="label" for="new_email">New email address</label>
+                            <div class="control">
+                                <input class="input" type="email" id="new_email"
+                                       name="new_email" autocomplete="off" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="email_current_password">
+                                Current password
+                            </label>
+                            <div class="control">
+                                <input class="input" type="password"
+                                       id="email_current_password" name="current_password"
+                                       autocomplete="current-password" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="button is-primary">
+                            Send Confirmation Link
+                        </button>
+                    </form>
+                </div>
+
+                <div class="box">
+                    <h2 class="title is-4">Change Password</h2>
+                    <form method="post" action="/account/password">
+                        <div class="field">
+                            <label class="label" for="password_current_password">
+                                Current password
+                            </label>
+                            <div class="control">
+                                <input class="input" type="password"
+                                       id="password_current_password" name="current_password"
+                                       autocomplete="current-password" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="new_password">New password</label>
+                            <div class="control">
+                                <input class="input" type="password" id="new_password"
+                                       name="new_password" minlength="10" maxlength="128"
+                                       autocomplete="new-password" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="confirm_password">
+                                Confirm new password
+                            </label>
+                            <div class="control">
+                                <input class="input" type="password" id="confirm_password"
+                                       name="confirm_password" minlength="10" maxlength="128"
+                                       autocomplete="new-password" required>
+                            </div>
+                            <p class="help">Use 10 to 128 characters. Spaces are allowed.</p>
+                        </div>
+                        <button type="submit" class="button is-primary">
+                            Change Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

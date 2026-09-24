@@ -115,3 +115,42 @@ def send_password_reset_email(to_address: str, raw_token: str) -> None:
         "<p>This link expires in 30 minutes. If you did not request this, "
         "you can ignore this email.</p>",
     )
+
+
+def send_email_change_verification(to_address: str, raw_token: str) -> None:
+    _, _, app_base_url = _configuration()
+    url = f"{app_base_url}/confirm-email-change/{raw_token}"
+    safe_url = html.escape(url, quote=True)
+    _send_email(
+        to_address,
+        "Confirm your new Food Truck Works email",
+        f"Confirm this email address by visiting this link:\n\n{url}\n\n"
+        "This link expires in 24 hours. If you did not request this, ignore it.",
+        "<p>Confirm this email address for your Food Truck Works account.</p>"
+        f"<p><a href=\"{safe_url}\">Confirm new email address</a></p>"
+        "<p>This link expires in 24 hours. If you did not request this, "
+        "you can ignore this email.</p>",
+    )
+
+
+def send_password_changed_email(to_address: str) -> None:
+    _send_email(
+        to_address,
+        "Your Food Truck Works password was changed",
+        "Your Food Truck Works password was changed. If you did not make "
+        "this change, use the password reset option on the login page.",
+        "<p>Your Food Truck Works password was changed.</p>"
+        "<p>If you did not make this change, use the password reset option "
+        "on the login page.</p>",
+    )
+
+
+def send_email_changed_notice(to_address: str) -> None:
+    _send_email(
+        to_address,
+        "Your Food Truck Works email was changed",
+        "The login email for your Food Truck Works account was changed. "
+        "If you did not make this change, contact support immediately.",
+        "<p>The login email for your Food Truck Works account was changed.</p>"
+        "<p>If you did not make this change, contact support immediately.</p>",
+    )

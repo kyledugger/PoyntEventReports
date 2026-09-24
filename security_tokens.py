@@ -10,8 +10,10 @@ from models import UserSecurityToken
 
 EMAIL_VERIFICATION = "email_verification"
 PASSWORD_RESET = "password_reset"
+EMAIL_CHANGE = "email_change"
 EMAIL_VERIFICATION_LIFETIME = timedelta(hours=24)
 PASSWORD_RESET_LIFETIME = timedelta(minutes=30)
+EMAIL_CHANGE_LIFETIME = timedelta(hours=24)
 EMAIL_RESEND_COOLDOWN = timedelta(minutes=5)
 
 

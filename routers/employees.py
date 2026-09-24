@@ -978,6 +978,8 @@ async def create_account(
             )
 
         user = User(
+            first_name=employee.first_name,
+            last_name=employee.last_name,
             email=email,
             password_hash=hash_password(password),
             is_active=True,
@@ -1216,6 +1218,13 @@ async def accept_invitation_with_existing_account(
 
         if password_needs_rehash(user.password_hash):
             user.password_hash = hash_password(password)
+
+        # Fill legacy account names from the employee record without
+        # overwriting an identity the user has already established.
+        if not user.first_name:
+            user.first_name = employee.first_name
+        if not user.last_name:
+            user.last_name = employee.last_name
 
         session.commit()
 

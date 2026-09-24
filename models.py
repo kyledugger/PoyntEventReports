@@ -16,6 +16,16 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    first_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    last_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
     email: Mapped[str] = mapped_column(
         String(320),
         unique=True,
@@ -44,6 +54,11 @@ class User(Base):
         nullable=True,
     )
 
+    pending_email: Mapped[str | None] = mapped_column(
+        String(320),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
@@ -54,6 +69,16 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    @property
+    def full_name(self) -> str:
+        return " ".join(
+            part for part in (self.first_name, self.last_name) if part
+        )
+
+    @property
+    def display_name(self) -> str:
+        return self.full_name or self.email
 
 
 class UserSecurityToken(Base):

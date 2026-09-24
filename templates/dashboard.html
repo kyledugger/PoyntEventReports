@@ -13,7 +13,7 @@
                     {% include "_app_brand.html" %}
 
                     <p class="subtitle is-6">
-                        Welcome, {{ user.email }}
+                        Welcome, {{ user.display_name }}
                     </p>
                 </div>
             </div>
@@ -30,6 +30,10 @@
                             {{ active_organization.name }}
                         </span>
                     {% endif %}
+
+                    <a href="/account" class="button is-light">
+                        Account Settings
+                    </a>
 
                     <form method="post" action="/logout">
                         <button type="submit" class="button is-light">Log Out</button>

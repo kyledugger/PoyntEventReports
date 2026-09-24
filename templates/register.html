@@ -52,6 +52,43 @@
                             </div>
                         </div>
 
+                        <div class="columns">
+                            <div class="column">
+                                <div class="field">
+                                    <label class="label" for="first_name">First Name</label>
+                                    <div class="control">
+                                        <input
+                                            class="input"
+                                            type="text"
+                                            id="first_name"
+                                            name="first_name"
+                                            value="{{ first_name or '' }}"
+                                            maxlength="100"
+                                            autocomplete="given-name"
+                                            required
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="field">
+                                    <label class="label" for="last_name">Last Name</label>
+                                    <div class="control">
+                                        <input
+                                            class="input"
+                                            type="text"
+                                            id="last_name"
+                                            name="last_name"
+                                            value="{{ last_name or '' }}"
+                                            maxlength="100"
+                                            autocomplete="family-name"
+                                            required
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="field">
                             <label class="label" for="email">Email</label>
                             <div class="control">

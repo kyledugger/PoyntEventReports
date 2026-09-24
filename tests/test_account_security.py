@@ -8,8 +8,13 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from email_service import EmailDeliveryError, send_password_reset_email
+from email_service import (
+    EmailDeliveryError,
+    send_email_change_verification,
+    send_password_reset_email,
+)
 from models import Base, User
+from routers.account_settings import validate_account_name
 from security_tokens import (
     EMAIL_VERIFICATION,
     EMAIL_VERIFICATION_LIFETIME,
@@ -52,6 +57,36 @@ class SecurityTokenTests(unittest.TestCase):
             self.assertIsNone(
                 get_valid_security_token(session, raw_token, PASSWORD_RESET)
             )
+
+
+class UserProfileTests(unittest.TestCase):
+    def test_display_name_uses_name_when_available(self):
+        user = User(
+            first_name="Kyle",
+            last_name="Dugger",
+            email="owner@example.com",
+            password_hash="not-used-in-this-test",
+        )
+        self.assertEqual(user.full_name, "Kyle Dugger")
+        self.assertEqual(user.display_name, "Kyle Dugger")
+
+    def test_display_name_falls_back_to_email_for_legacy_account(self):
+        user = User(
+            email="owner@example.com",
+            password_hash="not-used-in-this-test",
+        )
+        self.assertEqual(user.full_name, "")
+        self.assertEqual(user.display_name, "owner@example.com")
+
+    def test_account_name_validation_trims_and_requires_both_names(self):
+        first_name, last_name, error = validate_account_name(
+            "  Kyle  ", " Dugger "
+        )
+        self.assertEqual((first_name, last_name), ("Kyle", "Dugger"))
+        self.assertIsNone(error)
+
+        _, _, error = validate_account_name("Kyle", " ")
+        self.assertEqual(error, "First and last name are required.")
 
     def test_creating_a_replacement_invalidates_the_previous_token(self):
         with Session(self.engine) as session:
@@ -156,6 +191,32 @@ class PostmarkEmailTests(unittest.TestCase):
             "Recipient [redacted-email] is not allowed in test mode.",
         )
         self.assertNotIn("owner@example.com", error.postmark_message)
+
+    @patch.dict(
+        os.environ,
+        {
+            "POSTMARK_SERVER_TOKEN": "test-token",
+            "EMAIL_FROM": "support@example.com",
+            "APP_BASE_URL": "https://foodtruckworks.com/",
+        },
+        clear=False,
+    )
+    @patch("email_service.httpx.post")
+    def test_email_change_verification_uses_the_confirmation_route(self, post):
+        response = Mock()
+        response.is_success = True
+        post.return_value = response
+
+        send_email_change_verification(
+            "new-address@example.com", "raw-email-change-token"
+        )
+
+        _, kwargs = post.call_args
+        self.assertIn(
+            "https://foodtruckworks.com/confirm-email-change/"
+            "raw-email-change-token",
+            kwargs["json"]["TextBody"],
+        )
 
 
 if __name__ == "__main__":
